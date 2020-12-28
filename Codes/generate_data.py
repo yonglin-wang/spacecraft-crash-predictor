@@ -13,17 +13,21 @@ warnings.simplefilter(action="ignore", category=SettingWithCopyWarning)
 ####### define my own sliding window function
 def sliding_window(data, buck_size, step):
     list_all = []
-    temp_len = len(data[data.between(data.iloc[0], data.iloc[0] + buck_size)])
-    for i in range(len(data)): 
-        left = data.iloc[i] + i * step 
-        right = data.iloc[i] + i * step  + buck_size
-        series1 = data[data.between(left, right)] 
-        if len(series1)<2:
-            continue
-        if data.iloc[-1] - left < 0.5:
-            break 
-        list_all.append(series1)
-    return list_all
+    tmp = []
+    if data.iloc[-1] - data.iloc[0] < buck_size:
+        return  tmp
+    else:
+        temp_len = len(data[data.between(data.iloc[0], data.iloc[0] + buck_size)])
+        for i in range(len(data)): 
+            left = data.iloc[i] + i * step 
+            right = data.iloc[i] + i * step  + buck_size
+            series1 = data[data.between(left, right)] 
+            if len(series1)<2:
+                continue
+            if data.iloc[-1] - left < 0.5:
+                break 
+            list_all.append(series1)
+        return list_all
 
 
 
@@ -85,6 +89,8 @@ def generate_features(time_scale_train = 0.5,
             
             ##### resample & interpolate
             temp_df = temp_df[['seconds', 'currentVelRoll','currentPosRoll','calculated_vel','joystickX','peopleTrialKey']]
+            if len(temp_df) < 2:
+                continue
             x = temp_df.seconds
             y_calculated_vel = temp_df.calculated_vel
             y_org_vel = temp_df.currentVelRoll
@@ -151,7 +157,9 @@ def generate_features(time_scale_train = 0.5,
             print('----------------------', len(list_all[0]))
             print('xxxxxxxxxxxxxxxxxx', len(list_all[1]))
 
-            
+            if len(list_all) <1:
+                break
+
             for x in range(len(list_all)):
                 temp_df = df_trial[(df_trial.seconds >= list_all[x].iloc[0])\
                             & (df_trial.seconds <= list_all[x].iloc[-1])]
