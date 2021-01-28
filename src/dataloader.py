@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # Author: Yonglin Wang
 # Date: 2021/1/27
-# Data loader class for organizing numpy feature arrays
+# Data loader class for organizing numpy feature arrays and assembling training matrices
 
 import os
 import glob
@@ -16,18 +16,16 @@ from datetime import timedelta
 # import matplotlib.pyplot as plt
 import warnings
 from pandas.core.common import SettingWithCopyWarning
-from typing import Union
+from typing import Union, Tuple
 import tqdm
-
-warnings.simplefilter(action="ignore", category=SettingWithCopyWarning)
 
 from generate_data import COL_PATHS, preprocess_data, save_col, extract_destabilize
 
 # argparser value checker
-MIN_STEP = 0.04
+# MIN_STEP = 0.04
 
 # crash event criteria
-MIN_ENTRIES_BETWEEN = 2     # minimum # of entries between two crash events
+# MIN_ENTRIES_BETWEEN = 2     # minimum # of entries between two crash events
 
 # velocity mode tag
 CALCULATED = "calc"
@@ -37,10 +35,10 @@ ORIGINAL = "orig"
 OUT_DIR_FORMAT = "data/data_{}window_{}ahead_{}rolling/"
 
 # path to pickle dataloader
-LOADER_PATH = "dataloader.pkl"
+LOADER_BASENAME = "dataloader.pkl"
 
-CRASH_FILE_FORMAT = "crash_feature_label_{}ahead_{}scale_test"
-NONCRASH_FILE_FORMAT = "noncrash_feature_label_{}ahead_{}scale_test"
+# CRASH_FILE_FORMAT = "crash_feature_label_{}ahead_{}scale_test"
+# NONCRASH_FILE_FORMAT = "noncrash_feature_label_{}ahead_{}scale_test"
 DEBUG_EXCLUDE_FORMAT = "exclude_{}ahead_{}scale_test.csv"
 
 # columns with sampling rate in their shape (don't need broadcasting to stack with other non-sampled features)
@@ -59,7 +57,8 @@ class DataLoader():
                  time_ahead=0.5,
                  sampling_rate=50,
                  time_gap=5,
-                 rolling_step=0.5
+                 rolling_step=0.5,
+                 verbose=True
                  ):
 
         # ensure time_gap has the right size
@@ -72,20 +71,30 @@ class DataLoader():
         self.sampling_rate = sampling_rate
         self.time_gap = time_gap
         self.rolling_step = rolling_step
+        self.verbose = verbose
 
         # record and create directory to save feature columns
         self.outdir = OUT_DIR_FORMAT.format(int(self.window_size*1000),
                                             int(self.time_ahead*1000),
                                             int(self.rolling_step*1000))
 
-        # generate basic features here, import from generate_data.py
-        preprocess_data(window_size, time_ahead, sampling_rate, time_gap, rolling_step, self.outdir)
+        # ensure all features in COL_PATH, and regenerate all features
+        if not self._all_features_present():
+            if self.verbose:
+                print("Missing features, new regenerating...")
+            # generate features in
+            preprocess_data(self.window_size,
+                            self.time_ahead,
+                            self.sampling_rate,
+                            self.time_gap,
+                            self.rolling_step,
+                            self.outdir)
 
-        # generate and save additional features here: destabilizing, nomalized, etc...
-        self._generate_save_col(extract_destabilize(self.basic_triples()), "destabilizing")
+            # generate and save additional features here: destabilizing, nomalized, etc...
+            self._generate_save_col(extract_destabilize(self.basic_triples()), "destabilizing")
 
         # in the end. pickle self in output dir
-        pickle.dump(self, open(self._data_path(LOADER_PATH), "wb"))
+        pickle.dump(self, open(self._data_path(LOADER_BASENAME), "wb"))
 
     def _generate_save_col(self, col, col_name):
         """helper function to save given column"""
@@ -101,6 +110,25 @@ class DataLoader():
         :return: joined path
         """
         return os.path.join(self.outdir, basename)
+
+    def _all_features_present(self) -> list:
+        """
+        helper function check if all feature paths in COL_PATHS
+        :return: whether all feature files exist
+        """
+        # not present if path not exists
+        if os.path.exists(self.outdir):
+            return list(COL_PATHS.keys())
+
+        missing_feats = []
+
+        # check files under data path
+        for feat, feature_basename in COL_PATHS:
+            # not all present if one not exist
+            if not os.path.exists(self._data_path(feature_basename)):
+                missing_feats.append(feat)
+
+        return missing_feats
 
     def basic_triples(self, mode=ORIGINAL)->np.ndarray:
         """
@@ -134,6 +162,7 @@ class DataLoader():
         """
         # TODO allow list of cols via np.broadcast_to(arr4.reshape(-1,1), arr1.shape).shape
 
+
         if col_name not in COL_PATHS:
             raise ValueError("Cannot recognize column name {} in preset dictionary.".format(col_name))
 
@@ -144,6 +173,15 @@ class DataLoader():
 
         except FileNotFoundError:
             raise FileNotFoundError("Cannot find column array file {}".format(col_path))
+
+    def load_feat_matrix_config1(self, signature="base_three")->Tuple[np.ndarray, np.ndarray]:
+        """
+        load or create: 1) X feature matrix of shape (n, sampling_rate, 3) and
+        2) one-hot encoded y matrix of shape (n, 2)
+        :param signature: unique name for this configuration, also used as base name to save path
+        :return:
+        """
+        pass
 
 if __name__ == "__main__":
     pass

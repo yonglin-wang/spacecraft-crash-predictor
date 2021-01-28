@@ -2,37 +2,42 @@
 # -*- coding: utf-8 -*-
 # Author: Yonglin Wang
 # Date: 2021/1/27
-# Functions for extracting and saving features
+# This script includes:
+# - Functions for extracting and saving features
+# - All feature processing related static values for other scripts to read from
 
 import os
 import glob
+import time
 import pandas as pd
 import numpy as np
 import scipy as sp
 from scipy.interpolate import interp1d
-from datetime import timedelta
-# import matplotlib.pyplot as plt
+
+
 import warnings
 from pandas.core.common import SettingWithCopyWarning
 from typing import Union
 from tqdm import tqdm
 
-warnings.simplefilter(action="ignore", category=SettingWithCopyWarning)
+# warnings.simplefilter(action="ignore", category=SettingWithCopyWarning)
 
 import argparse
 import random
 
+from utils import display_exec_time
+
 # names to save each column under, original data if no "calculated" or "normalized" specified in file path
 # In principle,if the directory is not tampered, the following arrays should all have shape (n, [sampling_rate])
-COL_PATHS = {"velocity": "velocity.npy",
-             "velocity_cal": "velocity_calculated.npy",
-             "position": "position.npy",
-             "joystick": "joystick_deflection.npy",
-             "destabilizing": "destabilizing_deflection.npy",
-             "label": "label.npy",
-             "trial_key": "corresponding_peopleTrialKey.npy",
-             "start_seconds": "entry_start_seconds.npy",
-             "end_seconds": "entry_end_seconds.npy"
+COL_PATHS = {"velocity": "velocity.npy",                        # training, (n_sample, sampling_rate)
+             "velocity_cal": "velocity_calculated.npy",         # training, (n_sample, sampling_rate)
+             "position": "position.npy",                        # training, (n_sample, sampling_rate)
+             "joystick": "joystick_deflection.npy",             # training, (n_sample, sampling_rate)
+             "destabilizing": "destabilizing_deflection.npy",   # training, (n_sample, sampling_rate)
+             "label": "label.npy",                              # truth label. 1=crash, 0=noncrash
+             "trial_key": "corresponding_peopleTrialKey.npy",   # for output reference only
+             "start_seconds": "entry_start_seconds.npy",        # can be added as feature?
+             "end_seconds": "entry_end_seconds.npy"             # can be added as feature?
              }
 
 # control for randomness in case of any
@@ -203,9 +208,11 @@ def preprocess_data(window_size:float,
     :param time_step: the step to move window ahead in sliding window
     :param out_dir: output directory to save all features to
     """
+    # record time used for preprocessing
+    begin = time.time()
 
     # initial settings (to be moved)
-    np.set_printoptions(suppress=True)
+    # np.set_printoptions(suppress=True)
 
     # ensure output folder exists
     if not os.path.exists(out_dir):
@@ -243,7 +250,7 @@ def preprocess_data(window_size:float,
     # filter out non-human controls in data
     raw_data = raw_data[raw_data.trialPhase != 1]
 
-    # get unique peopleTrialKeys that have crashes
+    # get unique peopleTrialKeys that have crashes for skipping no-crash trials
     crash_keys_all = set(raw_data[raw_data.trialPhase == 4].peopleTrialKey.unique())
 
     ### initialize auxiliary objects for debugging
@@ -253,6 +260,8 @@ def preprocess_data(window_size:float,
     # record excluded crashes for validation analysis
     excluded_crashes_too_close = pd.DataFrame()
     excluded_crashes_too_few = pd.DataFrame()
+
+    print("Total number of trials to process: {}".format(len(crash_keys_all)))
 
     ### iterate through trials to process extract features
     with tqdm(total=raw_data.peopleTrialKey.nunique()) as pbar:
@@ -264,8 +273,9 @@ def preprocess_data(window_size:float,
                 crashes_this_trial = trial_raw_data[trial_raw_data.trialPhase == 4]
 
                 # Calculate each crash event's elapsed time since last crash (defined as difference since 0 for first crash)
-                crashes_this_trial["preceding_crash_seconds"] = crashes_this_trial.seconds.shift(1, fill_value=0)
-                crashes_this_trial["seconds_since_last_crash"] = crashes_this_trial.seconds - crashes_this_trial.preceding_crash_seconds
+                # Using assign to create new columns without evoking SettingWithCopyWarning
+                crashes_this_trial = crashes_this_trial.assign(preceding_crash_seconds=crashes_this_trial.seconds.shift(1, fill_value=0))
+                crashes_this_trial = crashes_this_trial.assign(seconds_since_last_crash=crashes_this_trial.seconds - crashes_this_trial.preceding_crash_seconds)
 
                 # Keep only crash events longer than given time gap away since last (NOT sliding window yet!)
                 valid_crash_entries = crashes_this_trial[crashes_this_trial["seconds_since_last_crash"] > time_gap]
@@ -302,7 +312,7 @@ def preprocess_data(window_size:float,
 
                     # find bounds to perform sliding window
                     # left bound: last crash time of current valid crash, safe to use [0] since seconds are unique
-                    left = valid_crash_entries["preceding_crash_seconds"].loc[valid_crash_entries.seconds == crash_time][0]
+                    left = valid_crash_entries["preceding_crash_seconds"].loc[valid_crash_entries.seconds == crash_time].iloc[0]
                     # right bound: crash interval ahead of current crash
                     right = crash_time - window_size - time_ahead
 
@@ -316,25 +326,28 @@ def preprocess_data(window_size:float,
                     if len(all_windows) >= 2:
                         # process each window
                         for win_start, win_end in all_windows:
-                            # restore all window entries
+                            # restore all window entries, bounds inclusive by default
                             entries_for_train = trial_raw_data[trial_raw_data.seconds.between(win_start, win_end)]
-
                             # resample & interpolate
                             process_entries(entries_for_train, current_trial_key, 0)
 
             # update progress bar
             pbar.update(1)
 
-    ### Save output
-    print("Processing over, now saving features...")
-    save_col(vel_ori_list, "velocity", out_dir, expect_len=len(label_list))
-    save_col(vel_cal_list, "velocity_cal", out_dir, expect_len=len(label_list))
-    save_col(position_list, "position", out_dir, expect_len=len(label_list))
-    save_col(joystick_list, "joystick", out_dir, expect_len=len(label_list))
-    save_col(label_list, "label", out_dir, expect_len=len(vel_cal_list))
-    save_col(trial_key_list, "trial_key", out_dir, expect_len=len(label_list))
-    save_col(start_list, "start_seconds", out_dir, expect_len=len(label_list))
-    save_col(end_list, "end_seconds", out_dir, expect_len=len(label_list))
+    ### Save feature output
+    print("Processing done! \nNow validating and saving features to \"{}\"...".format(out_dir), end="")
+
+    # record expected length
+    expected_length = len(label_list)
+    # save column as .npy files
+    [save_col(value, col_name, out_dir, expect_len=expected_length)
+     for value, col_name in [(vel_ori_list, "velocity"), (vel_cal_list, "velocity_cal"),
+                             (position_list, "position"), (joystick_list, "joystick"),
+                             (label_list, "label"), (trial_key_list, "trial_key"),
+                             (trial_key_list, "trial_key"), (start_list, "start_seconds"),
+                             (end_list, "end_seconds")]]
+
+    print("Done!\n")
 
     ### For debugging
     # report crash event stats
@@ -353,7 +366,25 @@ def preprocess_data(window_size:float,
     excluded_crashes_too_few.to_csv(os.path.join(out_dir, "too_few_between_" + debug_base), index=False)
     all_valid_crashes.to_csv(os.path.join(out_dir, "all_valid_crashes_" + debug_base), index=False)
 
-    print("Feature generation done!\n\n")
+    print("Total crash samples: {}\n"
+          "Total noncrash samples: {}".format(label_list.count(1), label_list.count(0)))
+
+    print("Feature generation done!")
+    display_exec_time(begin, scr_name=__file__)
+
+
+def broadcast_to_sampled(arr: np.ndarray, arr_sampled: np.ndarray)->np.ndarray:
+    """
+    append non-sampled array to a sampled array for generating training input
+    :param arr: non-sampled array to broadcast of (n, )
+    :param arr_sampled: sampled array of shape (n, sampling_rate, sampled_features)
+    :return: combined array of (n, sampling_rate, sampled_features + 1), with broadcast array at the end of sampled entry
+    """
+    # TODO allow list of cols via np.broadcast_to(arr4.reshape(-1,1), arr1.shape).shape
+    pass
+
+
+
 
 
 if __name__ == "__main__":
@@ -362,7 +393,7 @@ if __name__ == "__main__":
                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     argparser.add_argument(
-        '--scale', type=float, default=1.0, help='time scale of training data, in seconds')
+        '--window', type=float, default=1.0, help='size of sliding window to generate non-crash training data, in seconds')
     argparser.add_argument(
         '--ahead', type=float, default=0.5, help='prediction timing ahead of event, in seconds')
     argparser.add_argument(
@@ -385,12 +416,13 @@ if __name__ == "__main__":
     # Time gap is used to exclude those consecutive crash events happened within less than this length.
     # When two crash events happened too closely, we could not generate enough data to for interpolation.
     # In principle: time gap >= non crashing time scale + crushing time scale + time ahead of predicted event
-    if args.gap < (2 * args.scale + args.ahead):
-        args.gap = (2 * args.scale + args.ahead)
+    if args.gap < (2 * args.window + args.ahead):
+        args.gap = (2 * args.window + args.ahead)
 
-    # generate feature files
-    preprocess_data(window_size=args.scale,
+    # generate feature files, for debug only
+    preprocess_data(window_size=args.window,
                     time_ahead=args.ahead,
                     sampling_rate=args.rate,
                     time_gap=args.gap,
-                    time_step=args.rolling)
+                    time_step=args.rolling,
+                    out_dir="data/default_test_{}window_{}ahead_{}rolling/".format(args.window, args.ahead, args.rolling))
