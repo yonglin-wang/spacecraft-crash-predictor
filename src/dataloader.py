@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # Author: Yonglin Wang
 # Date: 2021/1/27
+# Data loader class for organizing numpy feature arrays
 
 import os
 import glob
@@ -15,12 +16,12 @@ from datetime import timedelta
 # import matplotlib.pyplot as plt
 import warnings
 from pandas.core.common import SettingWithCopyWarning
+from typing import Union
 import tqdm
 
 warnings.simplefilter(action="ignore", category=SettingWithCopyWarning)
 
-import argparse
-import random
+from generate_data import COL_PATHS, preprocess_data, save_col, extract_destabilize
 
 # argparser value checker
 MIN_STEP = 0.04
@@ -35,19 +36,6 @@ ORIGINAL = "orig"
 # paths for saving output
 OUT_DIR_FORMAT = "data/data_{}window_{}ahead_{}rolling/"
 
-# names to save each column under, original data if no "calculated" or "normalized" specified in file path
-# In principle,if the directory is not tampered, the following arrays should all have shape (n, [sampling_rate])
-COL_PATHS = {"velocity": "velocity.npy",
-             "velocity_cal": "velocity_calculated.npy",
-             "position": "position.npy",
-             "joystick": "joystick_deflection.npy",
-             "destabilizing": "destabilizing_deflection.npy",
-             "label": "label.npy",
-             "trial_key": "corresponding_peopleTrialKey.npy",
-             "start_seconds": "entry_start_seconds.npy",
-             "end_seconds": "entry_end_seconds.npy"
-             }
-
 # path to pickle dataloader
 LOADER_PATH = "dataloader.pkl"
 
@@ -55,10 +43,12 @@ CRASH_FILE_FORMAT = "crash_feature_label_{}ahead_{}scale_test"
 NONCRASH_FILE_FORMAT = "noncrash_feature_label_{}ahead_{}scale_test"
 DEBUG_EXCLUDE_FORMAT = "exclude_{}ahead_{}scale_test.csv"
 
-# columns we will use for interpolation
-COLS_TO_INTERPOLATE = ('currentVelRoll', 'currentPosRoll', 'calculated_vel', 'joystickX')
-OUT_COLS_AFTER_INTERPOLATE = ("features_cal_vel", "features_org_vel", 'label', 'peopleTrialKey',
-                              'start_seconds', 'end_seconds')
+# columns with sampling rate in their shape (don't need broadcasting to stack with other non-sampled features)
+SAMPLED_COLS = ("velocity", "velocity_cal", "position", "joystick", "destabilizing")
+# COLS_TO_INTERPOLATE = ('currentVelRoll', 'currentPosRoll', 'calculated_vel', 'joystickX')
+# OUT_COLS_AFTER_INTERPOLATE = ("features_cal_vel", "features_org_vel", 'label', 'peopleTrialKey',
+#                               'start_seconds', 'end_seconds')
+
 
 class DataLoader():
     """
@@ -88,12 +78,21 @@ class DataLoader():
                                             int(self.time_ahead*1000),
                                             int(self.rolling_step*1000))
 
-        # TODO generate basic features here, import from generate_data.py
+        # generate basic features here, import from generate_data.py
+        preprocess_data(window_size, time_ahead, sampling_rate, time_gap, rolling_step, self.outdir)
 
-        # TODO generate additional features here: destabilizing, nomalized, etc...
+        # generate and save additional features here: destabilizing, nomalized, etc...
+        self._generate_save_col(extract_destabilize(self.basic_triples()), "destabilizing")
 
         # in the end. pickle self in output dir
         pickle.dump(self, open(self._data_path(LOADER_PATH), "wb"))
+
+    def _generate_save_col(self, col, col_name):
+        """helper function to save given column"""
+        if col_name in COL_PATHS:
+            save_col(col, col_name, self.outdir)
+        else:
+            raise ValueError("Cannot recognize column name {} in COL_PATHS")
 
     def _data_path(self, basename:str)->str:
         """
@@ -127,12 +126,14 @@ class DataLoader():
         return np.dstack([velocity, position, joystick])
 
 
-    def retrieve_col(self, col_name:str)->np.ndarray:
+    def retrieve_col(self, col_name:Union[str, list])->np.ndarray:
         """
         retrieve column with specified name. Must be one of keys in COL_PATHS.
-        :param col_name: name of the column to return
-        :return: column of shape (n, ) or (n, sampling_rate)
+        :param col_name: name or names of the column to return
+        :return: column of shape (n, ) or (n, sampling_rate) or (n, sampling_rate, n_features)
         """
+        # TODO allow list of cols via np.broadcast_to(arr4.reshape(-1,1), arr1.shape).shape
+
         if col_name not in COL_PATHS:
             raise ValueError("Cannot recognize column name {} in preset dictionary.".format(col_name))
 

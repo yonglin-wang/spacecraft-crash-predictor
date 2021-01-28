@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Author: Yonglin Wang
+# Date: 2021/1/27
+# Functions for extracting and saving features
+
 import os
 import glob
 import pandas as pd
@@ -8,12 +14,26 @@ from datetime import timedelta
 # import matplotlib.pyplot as plt
 import warnings
 from pandas.core.common import SettingWithCopyWarning
-import tqdm
+from typing import Union
+from tqdm import tqdm
 
 warnings.simplefilter(action="ignore", category=SettingWithCopyWarning)
 
 import argparse
 import random
+
+# names to save each column under, original data if no "calculated" or "normalized" specified in file path
+# In principle,if the directory is not tampered, the following arrays should all have shape (n, [sampling_rate])
+COL_PATHS = {"velocity": "velocity.npy",
+             "velocity_cal": "velocity_calculated.npy",
+             "position": "position.npy",
+             "joystick": "joystick_deflection.npy",
+             "destabilizing": "destabilizing_deflection.npy",
+             "label": "label.npy",
+             "trial_key": "corresponding_peopleTrialKey.npy",
+             "start_seconds": "entry_start_seconds.npy",
+             "end_seconds": "entry_end_seconds.npy"
+             }
 
 # control for randomness in case of any
 RANDOM_SEED = 2020
@@ -27,18 +47,17 @@ MIN_STEP = 0.04
 MIN_ENTRIES_IN_WINDOW = 2     # minimum # of entries between two crash events (i.e. in a window)
 
 # paths for saving output
-OUT_DIR_FORMAT = "data/data_{}ms/"
-CRASH_FILE_FORMAT = "crash_feature_label_{}ahead_{}scale_test"
-NONCRASH_FILE_FORMAT = "noncrash_feature_label_{}ahead_{}scale_test"
-DEBUG_EXCLUDE_FORMAT = "exclude_{}ahead_{}scale_test.csv"
+# OUT_DIR_FORMAT = "data/data_{}ms/"
+# CRASH_FILE_FORMAT = "crash_feature_label_{}ahead_{}scale_test"
+# NONCRASH_FILE_FORMAT = "noncrash_feature_label_{}ahead_{}scale_test"
+DEBUG_FORMAT = "debug_{}ahead_{}scale_test.csv"
 
 # columns we will use for interpolation
 COLS_TO_INTERPOLATE = ('currentVelRoll', 'currentPosRoll', 'calculated_vel', 'joystickX')
-OUT_COLS_AFTER_INTERPOLATE = ("features_cal_vel", "features_org_vel", 'label', 'peopleTrialKey',
-                              'start_seconds', 'end_seconds')
+# OUT_COLS_AFTER_INTERPOLATE = ("features_cal_vel", "features_org_vel", 'label', 'peopleTrialKey',
+#                               'start_seconds', 'end_seconds')
 
 
-####### define my own sliding window function
 def sliding_window(interval_series:pd.Series, time_scale:float, rolling_step:float, avoid_duplicate=False) -> list:
     """
     Identify extractable valid window boundaries (inclusive) in given slice of the seconds column.
@@ -120,42 +139,32 @@ def interpolate_entries(entries,
 
     return output
 
-def assemble_feature_row(window_data)->pd.DataFrame:
+
+def save_col(col_array:Union[list, np.ndarray], col_name:str, out_dir:str, expect_len=-1):
     """
-    generate row of features for concatenation and feature extraction, given a window of raw data
-    If new features are added, add their extraction output here
-    :param window_data: DataFrame containing rows of raw data in a window
-    :return: row containing processed features
+    save array as numpy .npy file
+    :param col_array: list or ndarray to be saved
+    :param col_name: name of column to be saved, must be key in COL_PATHS
+    :param out_dir: output directory to save object to
+    :param expect_len: expected length of the input; if specified, error if different
     """
-    pass
+    # check if col_name correct
+    if col_name not in COL_PATHS:
+        raise ValueError("Cannot recognize column name {} in COL_PATHS".format(col_name))
 
-def get_basic_feature_matrix(int_results:dict,
-                       sampling_rate:int,
-                       use_cal=False,
-                       )->np.ndarray:
-    """
-    reads results from interpolate_entries and generate a feature matrix of (sampling_rate, feature_num).
-    Each row has 3 features: velocity, position, joystick
-    :param int_results: dictionary results from interpolate_entries
-    :param destabilize: whether to include destabilizing joystick movement
-    :return: feature matrix of (sampling_rate, feature_num)
-    """
+    # check length if needed
+    if expect_len > -1:
+        if len(col_array) != expect_len:
+            raise ValueError("Column array length {} does not match expected length {}".format(
+                len(col_array), expect_len))
 
+    # convert list to array before saving
+    if isinstance(col_array, list):
+        col_array = np.array(col_array)
 
-    if use_cal:
-        # use calculated velocity
-        new_vel = int_results["calculated_vel"]
-    else:
-        # use original velocity
-        new_vel = int_results["currentVelRoll"]
+    # save to given output directory
+    np.save(os.path.join(out_dir, COL_PATHS[col_name]), col_array)
 
-    new_currentPosRoll = int_results["currentPosRoll"]
-    new_joystickX = int_results["joystickX"]
-
-    # output the basic rows of triples
-    output = np.dstack([new_vel, new_currentPosRoll, new_joystickX]).reshape(sampling_rate, 3)
-
-    return output
 
 def extract_destabilize(feature_matrix: np.ndarray)->np.ndarray:
     """
@@ -178,6 +187,7 @@ def extract_destabilize(feature_matrix: np.ndarray)->np.ndarray:
     num_feats = feature_matrix.shape[1]
     return np.equal(same_sign.sum(axis=1), num_feats)
 
+
 def preprocess_data(window_size:float,
                     time_ahead:float,
                     sampling_rate:int,
@@ -194,64 +204,14 @@ def preprocess_data(window_size:float,
     :param out_dir: output directory to save all features to
     """
 
-
-    '''
-    author: Jie Tang， Yonglin Wang
-    inputs:
-        time_scale_train: time length of data used for training, in seconds
-        time_ahead: time in advance to predict, in seconds
-        sampling_rate: sampling rate in each time_scale_train
-        time_gap: minimal length of time allowed between two crash events for sliding windows extraction
-
-        time_step: the step we will move when we do sliding window
-    '''
     # initial settings (to be moved)
     np.set_printoptions(suppress=True)
-    #
-    # # convert time unit and get output paths
-    # ahead_ms_str = str(int(time_ahead * 1000))
-    # scale_ms_str = str(int(time_scale_train * 1000))
-
-    # crash_pickle_path = os.path.join(OUT_DIR_FORMAT.format(scale_ms_str), CRASH_FILE_FORMAT.format(ahead_ms_str, scale_ms_str))
-    # noncrash_pickle_path = os.path.join(OUT_DIR_FORMAT.format(scale_ms_str), NONCRASH_FILE_FORMAT.format(ahead_ms_str, scale_ms_str))
 
     # ensure output folder exists
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
-    # getting data
-    # data_all = pd.read_csv('data/data_all.csv')
-
-    ##### extract all needed columns ######
-    cols_used = ['seconds', 'trialPhase', 'currentPosRoll', 'currentVelRoll', 'calculated_vel',
-                  'joystickX', 'peopleName', 'trialName', 'peopleTrialKey']
-
-    raw_data = pd.read_csv('data/data_all.csv', usecols=cols_used)
-    # raw_data['datetimeNew'] = pd.to_datetime(raw_data['datetimeNew'])
-    # filter out non-human controls in data
-    raw_data = raw_data[raw_data.trialPhase != 1]
-    # raw_data.set_index('datetimeNew', inplace=True)
-
-    # find all crash controls by trial phase
-    crash_data = raw_data[raw_data.trialPhase == 4]
-
-    # get unique peopleTrialKeys that have crashes
-    crash_keys_all = set(crash_data.peopleTrialKey.unique())
-
-
-    # record crash events that are not too short from the previous crash
-    all_valid_crashes = pd.DataFrame()
-
-    # record excluded crashes
-    excluded_crashes_too_close = pd.DataFrame()
-    excluded_crashes_too_few = pd.DataFrame()
-
-    # keep track of valid crash events for validation
-    crashes_in_training = 0
-
-    # generate feature and save
-    crash_feature_label_df = pd.DataFrame()
-
+    ### output and helper functions
     # lists to convert to np for save, each of length n_samples
     vel_ori_list = []
     vel_cal_list = []
@@ -264,7 +224,7 @@ def preprocess_data(window_size:float,
 
     def process_entries(entries_for_train, trial_key:str, label:int):
         """helper function to interpolate entries and record output"""
-        int_results = interpolate_entries(entries_for_train, sampling_rate=50)
+        int_results = interpolate_entries(entries_for_train, sampling_rate=sampling_rate)
 
         vel_ori_list.append(int_results["currentVelRoll"])
         vel_cal_list.append(int_results["calculated_vel"])
@@ -275,186 +235,125 @@ def preprocess_data(window_size:float,
         start_list.append(entries_for_train['seconds'].iloc[0])
         end_list.append(entries_for_train['seconds'].iloc[-1])
 
-    # extract crash events features from each trial
-    for current_trial_key, trial_raw_data in raw_data.groupby("peopleTrialKey"):
-        # only process keys that has crashes
-        if current_trial_key in crash_keys_all:
-            # find all crash data points in this trial
-            crashes_this_trial = trial_raw_data[trial_raw_data.trialPhase == 4]
+    ### load raw data
+    # extract all needed columns
+    raw_data = pd.read_csv('data/data_all.csv', usecols=['seconds', 'trialPhase', 'currentPosRoll', 'currentVelRoll', 'calculated_vel',
+                  'joystickX', 'peopleTrialKey'])
 
-            # Calculate each crash event's elapsed time since last crash (defined as difference since 0 for first crash)
-            crashes_this_trial["preceding_crash_seconds"] = crashes_this_trial.seconds.shift(1, fill_value=0)
-            crashes_this_trial["seconds_since_last_crash"] = crashes_this_trial.seconds - crashes_this_trial.preceding_crash_seconds
+    # filter out non-human controls in data
+    raw_data = raw_data[raw_data.trialPhase != 1]
 
-            # Keep only crash events longer than given time gap away since last (NOT sliding window yet!)
-            valid_crash_entries = crashes_this_trial[crashes_this_trial["seconds_since_last_crash"] > time_gap]
+    # get unique peopleTrialKeys that have crashes
+    crash_keys_all = set(raw_data[raw_data.trialPhase == 4].peopleTrialKey.unique())
 
-            # record crash events this trial for later use
-            all_valid_crashes = pd.concat([all_valid_crashes, valid_crash_entries])
+    ### initialize auxiliary objects for debugging
+    # record crash events that are not too short from the previous crash
+    all_valid_crashes = pd.DataFrame()
 
-            # For validation, include excluded crash events too
-            invalid_crash_entries = crashes_this_trial[crashes_this_trial["seconds_since_last_crash"] <= time_gap]
-            excluded_crashes_too_close = pd.concat([excluded_crashes_too_close, invalid_crash_entries])
+    # record excluded crashes for validation analysis
+    excluded_crashes_too_close = pd.DataFrame()
+    excluded_crashes_too_few = pd.DataFrame()
 
-            # iterate through each valid crash to create data entry
-            for crash_time in valid_crash_entries.seconds:
+    ### iterate through trials to process extract features
+    with tqdm(total=raw_data.peopleTrialKey.nunique()) as pbar:
+        # extract crash events features from each trial
+        for current_trial_key, trial_raw_data in raw_data.groupby("peopleTrialKey"):
+            # only process keys that has crashes
+            if current_trial_key in crash_keys_all:
+                # find all crash data points in this trial
+                crashes_this_trial = trial_raw_data[trial_raw_data.trialPhase == 4]
 
-                # (1/2) Extract Crash Events in each group
-                # find corresponding data points between time scale start and crash event to generate training data
-                entries_for_train = trial_raw_data[trial_raw_data.seconds.between(
-                    crash_time - window_size - time_ahead, crash_time - time_ahead)]
+                # Calculate each crash event's elapsed time since last crash (defined as difference since 0 for first crash)
+                crashes_this_trial["preceding_crash_seconds"] = crashes_this_trial.seconds.shift(1, fill_value=0)
+                crashes_this_trial["seconds_since_last_crash"] = crashes_this_trial.seconds - crashes_this_trial.preceding_crash_seconds
 
-                # only process entries with more than one data points
-                if len(entries_for_train) >= MIN_ENTRIES_IN_WINDOW:
-                    # resample & interpolate
-                    process_entries(entries_for_train, current_trial_key, 1)
+                # Keep only crash events longer than given time gap away since last (NOT sliding window yet!)
+                valid_crash_entries = crashes_this_trial[crashes_this_trial["seconds_since_last_crash"] > time_gap]
 
-                else:
-                    print("Found a crash window with # of entries < {}!".format(MIN_ENTRIES_IN_WINDOW))
-                    ex_crash = trial_raw_data[trial_raw_data.seconds == crash_time]
-                    ex_crash["entries_since_last_crash"] = len(entries_for_train)
-                    excluded_crashes_too_few = pd.concat([excluded_crashes_too_few, ex_crash])
-                    # # Get copy of current len = 1 or 0 entry
-                    # lone_entry_copy = entries_for_train.copy()
+                # record crash events this trial for later use
+                all_valid_crashes = pd.concat([all_valid_crashes, valid_crash_entries])
 
-                # (2/2) Extract Noncrash Events in each group
+                # For validation, include excluded crash events too
+                invalid_crash_entries = crashes_this_trial[crashes_this_trial["seconds_since_last_crash"] <= time_gap]
+                excluded_crashes_too_close = pd.concat([excluded_crashes_too_close, invalid_crash_entries])
 
-                # find bounds to perform sliding window
-                # left bound: last crash time of current valid crash, safe to use [0] since seconds are unique
-                left = valid_crash_entries["preceding_crash_seconds"].loc[valid_crash_entries.seconds == crash_time][0]
-                # right bound: crash interval ahead of current crash
-                right = crash_time - window_size - time_ahead
+                # iterate through each valid crash to create data entry
+                for crash_time in valid_crash_entries.seconds:
 
-                # crucially not include left boundary (last crash entry)
-                sliding_series = trial_raw_data.seconds[(trial_raw_data.seconds > left) & (trial_raw_data.seconds <= right)]
+                    ### (1/2) Extract Crash Events in each group
+                    # find corresponding data points between time scale start and crash event to generate training data
+                    entries_for_train = trial_raw_data[trial_raw_data.seconds.between(
+                        crash_time - window_size - time_ahead, crash_time - time_ahead)]
 
-                # run sliding window on noncrash event
-                all_windows = sliding_window(sliding_series, window_size, time_step)
-
-                # only record list with more than 1 data points
-                if len(all_windows) >= 2:
-                    for win_start, win_end in all_windows:
-                        # restore all window entries
-                        entries_for_train = trial_raw_data[trial_raw_data.seconds.between(win_start, win_end)]
-
+                    # only process entries with more than one data points
+                    if len(entries_for_train) >= MIN_ENTRIES_IN_WINDOW:
                         # resample & interpolate
-                        process_entries(entries_for_train, current_trial_key, 0)
+                        process_entries(entries_for_train, current_trial_key, 1)
 
+                    else:
+                        # print("Found a crash window with # of entries < {}!".format(MIN_ENTRIES_IN_WINDOW))
+                        ex_crash = trial_raw_data[trial_raw_data.seconds == crash_time]
+                        ex_crash["entries_since_last_crash"] = len(entries_for_train)
+                        excluded_crashes_too_few = pd.concat([excluded_crashes_too_few, ex_crash])
+                        # # Get copy of current len = 1 or 0 entry
+                        # lone_entry_copy = entries_for_train.copy()
+
+                    ### (2/2) Extract Noncrash Events in each group
+
+                    # find bounds to perform sliding window
+                    # left bound: last crash time of current valid crash, safe to use [0] since seconds are unique
+                    left = valid_crash_entries["preceding_crash_seconds"].loc[valid_crash_entries.seconds == crash_time][0]
+                    # right bound: crash interval ahead of current crash
+                    right = crash_time - window_size - time_ahead
+
+                    # crucially not include left boundary (last crash entry)
+                    sliding_series = trial_raw_data.seconds[(trial_raw_data.seconds > left) & (trial_raw_data.seconds <= right)]
+
+                    # run sliding window on noncrash event
+                    all_windows = sliding_window(sliding_series, window_size, time_step)
+
+                    # only record list with more than 1 data points
+                    if len(all_windows) >= 2:
+                        # process each window
+                        for win_start, win_end in all_windows:
+                            # restore all window entries
+                            entries_for_train = trial_raw_data[trial_raw_data.seconds.between(win_start, win_end)]
+
+                            # resample & interpolate
+                            process_entries(entries_for_train, current_trial_key, 0)
+
+            # update progress bar
+            pbar.update(1)
+
+    ### Save output
+    print("Processing over, now saving features...")
+    save_col(vel_ori_list, "velocity", out_dir, expect_len=len(label_list))
+    save_col(vel_cal_list, "velocity_cal", out_dir, expect_len=len(label_list))
+    save_col(position_list, "position", out_dir, expect_len=len(label_list))
+    save_col(joystick_list, "joystick", out_dir, expect_len=len(label_list))
+    save_col(label_list, "label", out_dir, expect_len=len(vel_cal_list))
+    save_col(trial_key_list, "trial_key", out_dir, expect_len=len(label_list))
+    save_col(start_list, "start_seconds", out_dir, expect_len=len(label_list))
+    save_col(end_list, "end_seconds", out_dir, expect_len=len(label_list))
+
+    ### For debugging
     # report crash event stats
     print("Total crashes in all raw data: {}\n"
           "{} crashes excluded due to following last crash in less than {}s\n"
           "{} crashes excluded due to having fewer than {} entries since last crash\n"
-          "{} crashes included in training data".format(
-        len(excluded_crashes_too_close) + len(excluded_crashes_too_few) + len(crash_feature_label_df),
+          "{} crashes included in training data\n".format(
+        len(excluded_crashes_too_close) + len(excluded_crashes_too_few) + len(label_list),
         len(excluded_crashes_too_close), time_gap,
         len(excluded_crashes_too_few), MIN_ENTRIES_IN_WINDOW,
-        len(crash_feature_label_df)))
+        len(label_list)))
 
-    # record excluded entries for analysis TODO one to csv function?
-    excluded_crashes_too_close.to_csv(os.path.join(out_dir, "too_close_to_last" + DEBUG_EXCLUDE_FORMAT.format(int(time_ahead*1000), scale_ms_str)))
-    excluded_crashes_too_few.to_csv(os.path.join(out_dir, "too_few_between" + DEBUG_EXCLUDE_FORMAT.format(int(time_ahead*1000), scale_ms_str)))
+    # record excluded entries for analysis
+    debug_base = DEBUG_FORMAT.format(int(time_ahead*1000), int(window_size*1000))
+    excluded_crashes_too_close.to_csv(os.path.join(out_dir, "too_close_to_last_" + debug_base), index=False)
+    excluded_crashes_too_few.to_csv(os.path.join(out_dir, "too_few_between_" + debug_base), index=False)
+    all_valid_crashes.to_csv(os.path.join(out_dir, "all_valid_crashes_" + debug_base), index=False)
 
-    # for trial_key in crash_keys_all:
-    #     # First collect all valid
-    #     # Collect all crashes for given person and trial
-    #     trial_data = crash_data[crash_data.peopleTrialKey == trial_key]
-    #     # Calculate each crash event's elapsed time since last crash (defined as difference since 0 for first crash)
-    #     times_since_last = trial_data['seconds'] - trial_data['seconds'].shift(1, fill_value=0)
-    #
-    #     # Keep only crash events longer than given time gap away since last
-    #     valid_trial_data = trial_data[times_since_last > time_gap]
-    #     crash_events_valid = pd.concat([crash_events_valid, valid_trial_data])
-    #
-    #     # For validation, include excluded crash events
-    #     invalid_trial_data = trial_data[times_since_last <= time_gap]
-    #     times_since_last.name = "seconds_since_last_crash"
-    #     invalid_trial_data.join(times_since_last)
-    #     excluded_crashes = pd.concat([excluded_crashes, invalid_trial_data])
-
-    # debug only
-    # valid_crashes.to_csv("valids_new.csv")
-
-    # save crash features as pickle for training
-    # crash_feature_label_df.to_pickle(crash_pickle_path)
-    #
-    # ####### noncrash event data info  ######
-    #
-    # peopleTrialHasCrash_ex = all_valid_crashes.peopleTrialKey.unique()
-    #
-    # noncrash_feature_label_df = pd.DataFrame()
-    #
-    # print("extracting")
-    # for num in range(len(peopleTrialHasCrash_ex)):
-    #     curr_crash_key = peopleTrialHasCrash_ex[num]
-    #     # print(num)
-    #     # again, find valid intervals between crashes
-    #     trial_data = all_valid_crashes[all_valid_crashes.peopleTrialKey == curr_crash_key]
-    #     trial_data['seconds_shift'] = trial_data['seconds'].shift(1)
-    #     trial_data.fillna(0, inplace=True)
-    #     trial_data['time_gap'] = trial_data['seconds'] - trial_data['seconds_shift']
-    #
-    #     # all trial data at current key
-    #     df_trial = raw_data[(raw_data['peopleTrialKey'] == curr_crash_key)]
-    #
-    #     for crash_time in (all_valid_crashes.loc[
-    #         (all_valid_crashes['peopleTrialKey'] == curr_crash_key), 'seconds']):
-    #         pass
-    #         # left bound: last crash time of current valid crash
-    #         # left = trial_data.seconds_shift[trial_data.seconds == crash_time].iloc[0]
-    #         # # right bound: crash interval ahead of current crash
-    #         # right = crash_time - time_scale_train - time_ahead
-    #         #
-    #         # # crucially not include left boundary (last crash entry)
-    #         # temp_serie = df_trial.loc[(df_trial.seconds > left) & (df_trial.seconds <= right), 'seconds']
-    #         #
-    #         # # run sliding window on noncrash event
-    #         # list_all = sliding_window(temp_serie, time_scale_train, time_step)
-    #         #
-    #         # # only record list with more than 2 data points
-    #         # if len(list_all) >= 2:
-    #         #     for l_num in range(len(list_all)):
-    #         #         # print("l_num")
-    #         #         # print(l_num)
-    #         #         # print("list_all[l_num]")
-    #         #         # print(list_all[l_num])
-    #         #         entries_for_train = df_trial[(df_trial.seconds >= list_all[l_num].iloc[0]) \
-    #         #                            & (df_trial.seconds <= list_all[l_num].iloc[-1])]
-    #         #
-    #         #         ##### resample & interpolate
-    #         #         entries_for_train = entries_for_train[
-    #         #             ['seconds', 'currentVelRoll', 'currentPosRoll', 'calculated_vel', 'joystickX', 'peopleTrialKey']]
-    #         #         x = entries_for_train.seconds
-    #         #         y_calculated_vel = entries_for_train.calculated_vel
-    #         #         y_org_vel = entries_for_train.currentVelRoll
-    #         #         y_currentPosRoll = entries_for_train.currentPosRoll
-    #         #         y_joystickX = entries_for_train.joystickX
-    #         #
-    #         #         new_x = np.linspace(x.min(), x.max(), sampling_rate)
-    #         #         new_y_calculated_vel = sp.interpolate.interp1d(x, y_calculated_vel, kind='linear')(new_x)
-    #         #         new_y_original_vel = sp.interpolate.interp1d(x, y_org_vel, kind='linear')(new_x)
-    #         #         new_y_currentPosRoll = sp.interpolate.interp1d(x, y_currentPosRoll, kind='linear')(new_x)
-    #         #         new_y_joystickX = sp.interpolate.interp1d(x, y_joystickX, kind='linear')(new_x)
-    #         #
-    #         #         arr11 = np.dstack([new_y_calculated_vel, new_y_currentPosRoll, new_y_joystickX]).reshape(sampling_rate,
-    #         #                                                                                                  3)
-    #         #         arr22 = np.dstack([new_y_original_vel, new_y_currentPosRoll, new_y_joystickX]).reshape(sampling_rate, 3)
-    #         #         arr33 = 0
-    #         #         arr44 = entries_for_train['peopleTrialKey'].iloc[0]
-    #         #         arr55 = entries_for_train['seconds'].iloc[0]
-    #         #         arr66 = entries_for_train['seconds'].iloc[-1]
-    #         #
-    #         #         noncrash_feature_label_df = pd.concat(
-    #         #             [noncrash_feature_label_df, pd.DataFrame([[arr11, arr22, arr33, arr44, arr55, arr66]],
-    #         #                                                      columns=["features_cal_vel", "features_org_vel", 'label',
-    #         #                                                               'peopleTrialKey', 'start_seconds',
-    #         #                                                               'end_seconds'])])
-    #
-    #             ## save it as pickle for training
-    # # noncrash_feature_label_df.to_pickle(noncrash_pickle_path)
-
-    # TODO save columns instead
-
-    print("Feature generation done!")
+    print("Feature generation done!\n\n")
 
 
 if __name__ == "__main__":
