@@ -94,6 +94,9 @@ print(f"Now training model with {scale_ms}ms scale, {ahead_ms}ms ahead.\n"
 if early_stopping:
     print(f"Stopping early if no {conv_criteria} improvement in {patience_epochs} epochs.\n")
 
+if use_calculated:
+    print("Using calculated velocity...")
+
 
 #### Begin script
 # confirm TensorFlow sees the GPU
@@ -110,7 +113,7 @@ def load_sets_after_split(ahead_ms, scale_ms, mode=ORIGINAL):
         raise ValueError("Unknown velocity mode: {}".format(mode))
 
     return map(lambda format_path: np.load(open(format_path.format(scale_ms, ahead_ms, scale_ms, mode), "rb")),
-               (TRAIN_PATH_X, TRAIN_PATH_Y, TEST_PATH_X, TEST_PATH_Y))
+               (TRAIN_PATH_X, TEST_PATH_X, TRAIN_PATH_Y, TEST_PATH_Y))
 
 def save_sets_after_split(X_train, X_test, y_train, y_test, ahead_ms, scale_ms, mode=ORIGINAL):
     if mode not in (CALCULATED, ORIGINAL):
@@ -157,16 +160,18 @@ except:
     ### original velocity
     # choose velocity TODO change this to before loading data
     if use_calculated:
-        X_all = data_final.features_cal_vel
+        X_all = np.array(data_final.features_cal_vel.to_list())
     else:
-        X_all = data_final.features_org_vel
-    X_all = np.array([np.vstack(i) for i in X_all])
+        X_all = np.array(data_final.features_org_vel.to_list())
+
+    # X_all = np.array([np.vstack(i) for i in X_all])
     print("X_all shape: {}".format(X_all.shape))
 
     # y_all = np.array(data_final.label)
 
-    y_all = data_final.label.to_numpy()
+    y_all = data_final.label.to_numpy().reshape(-1, 1)
     print("y_all shape: {}".format(y_all.shape))
+    print(f"Total crash instances: {np.count_nonzero(y_all == 1)}")
     # X_train_cal, X_test_cal, y_train_cal, y_test_cal = train_test_split(X_cal, y, test_size=0.2, random_state=42)
 
     X_train, X_test, y_train, y_test = train_test_split(X_all, y_all, test_size=0.2, random_state=SEED)
@@ -189,14 +194,14 @@ print("y_test shape: {}".format(y_test.shape))
 # X_test_cal = sequence.pad_sequences(X_test_cal, maxlen=50, padding='post', dtype='float', truncating='post')
 # y_test_cal = np.array(y_test_cal).reshape(len(y_test_cal),1)
 
-print("Training model...")
+print("Processing Data...")
 
-### original velocity
+# pad sequences TODO trains don't need to be aligned?
 X_train = sequence.pad_sequences(X_train, maxlen=50, padding='post', dtype='float', truncating='post')
-y_train = np.array(y_train).reshape(len(y_train), 1)
+# y_train = y_train.reshape(-1, 1)
 
 X_test = sequence.pad_sequences(X_test, maxlen=50, padding='post', dtype='float', truncating='post')
-y_test = np.array(y_test).reshape(len(y_test), 1)
+# y_test = y_test.reshape(-1, 1)
 
 
 #### onehotecoder
@@ -205,6 +210,11 @@ enc = enc.fit(y_train)
 y_train = enc.transform(y_train)
 y_test = enc.transform(y_test)
 
+print("After padding X and OH encoding y...")
+print("X_train shape: {}".format(X_train.shape))
+print("y_train shape: {}".format(y_train.shape))
+print("X_test shape: {}".format(X_test.shape))
+print("y_test shape: {}".format(y_test.shape))
 
 ### train model
 
@@ -223,7 +233,7 @@ class_weights = [{
 
 ### try different weights
 for i in range(len(class_weights)):
-    print(f'---------Now training class weight {class_weights[i][0]}to{class_weights[i][1]}-------------')
+    print(f'---------Now training model with class weight {class_weights[i][0]}to{class_weights[i][1]}-------------')
     # initialize new model for this setting
     model = keras.Sequential()
     model.add(
@@ -294,6 +304,6 @@ for i in range(len(class_weights)):
     # pickle model training history
     pickle.dump(history, open(f'results/results_{scale_ms}/{scale_ms}scale_{ahead_ms}ahead_{class_weights[i][0]}to{class_weights[i][1]}_history_orig_vel.pkl', "wb"))
 
-display_exec_time(begin, scr_name="model_org.py")
+display_exec_time(begin, scr_name="model.py")
     # print(predictions_cal.shape, testing_cal.shape)
 
