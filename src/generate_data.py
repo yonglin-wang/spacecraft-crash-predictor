@@ -3,7 +3,7 @@
 # Author: Yonglin Wang
 # Date: 2021/1/27
 # This script includes:
-# - Functions for extracting and saving features
+# - Functions for extracting and saving feature numpy arrays
 # - All feature processing related static values for other scripts to read from
 
 import os
@@ -14,22 +14,18 @@ import numpy as np
 import scipy as sp
 from scipy.interpolate import interp1d
 
-
-import warnings
-from pandas.core.common import SettingWithCopyWarning
 from typing import Union
 from tqdm import tqdm
 
-# warnings.simplefilter(action="ignore", category=SettingWithCopyWarning)
-
 import argparse
 import random
+from collections import OrderedDict
 
 from utils import display_exec_time
 
 # names to save each column under, original data if no "calculated" or "normalized" specified in file path
 # In principle,if the directory is not tampered, the following arrays should all have shape (n, [sampling_rate])
-COL_PATHS = {"velocity": "velocity.npy",                        # training, (n_sample, sampling_rate)
+COL_PATHS = OrderedDict({"velocity": "velocity.npy",            # training, (n_sample, sampling_rate)
              "velocity_cal": "velocity_calculated.npy",         # training, (n_sample, sampling_rate)
              "position": "position.npy",                        # training, (n_sample, sampling_rate)
              "joystick": "joystick_deflection.npy",             # training, (n_sample, sampling_rate)
@@ -38,7 +34,7 @@ COL_PATHS = {"velocity": "velocity.npy",                        # training, (n_s
              "trial_key": "corresponding_peopleTrialKey.npy",   # for output reference only
              "start_seconds": "entry_start_seconds.npy",        # can be added as feature?
              "end_seconds": "entry_end_seconds.npy"             # can be added as feature?
-             }
+             })
 
 # control for randomness in case of any
 RANDOM_SEED = 2020
@@ -52,15 +48,10 @@ MIN_STEP = 0.04
 MIN_ENTRIES_IN_WINDOW = 2     # minimum # of entries between two crash events (i.e. in a window)
 
 # paths for saving output
-# OUT_DIR_FORMAT = "data/data_{}ms/"
-# CRASH_FILE_FORMAT = "crash_feature_label_{}ahead_{}scale_test"
-# NONCRASH_FILE_FORMAT = "noncrash_feature_label_{}ahead_{}scale_test"
 DEBUG_FORMAT = "debug_{}ahead_{}scale_test.csv"
 
 # columns we will use for interpolation
 COLS_TO_INTERPOLATE = ('currentVelRoll', 'currentPosRoll', 'calculated_vel', 'joystickX')
-# OUT_COLS_AFTER_INTERPOLATE = ("features_cal_vel", "features_org_vel", 'label', 'peopleTrialKey',
-#                               'start_seconds', 'end_seconds')
 
 
 def sliding_window(interval_series:pd.Series, time_scale:float, rolling_step:float, avoid_duplicate=False) -> list:
@@ -143,13 +134,14 @@ def interpolate_entries(entries,
     return output
 
 
-def save_col(col_array:Union[list, np.ndarray], col_name:str, out_dir:str, expect_len=-1):
+def save_col(col_array:Union[list, np.ndarray], col_name:str, out_dir:str, expect_len=-1, dtype=None):
     """
     save array as numpy .npy file
     :param col_array: list or ndarray to be saved
     :param col_name: name of column to be saved, must be key in COL_PATHS
     :param out_dir: output directory to save object to
     :param expect_len: expected length of the input; if specified, error if different
+    :param dtype: dtype for numpy array to be saved, used to save space
     """
     # check if col_name correct
     if col_name not in COL_PATHS:
@@ -166,7 +158,10 @@ def save_col(col_array:Union[list, np.ndarray], col_name:str, out_dir:str, expec
         col_array = np.array(col_array)
 
     # save to given output directory
-    np.save(os.path.join(out_dir, COL_PATHS[col_name]), col_array)
+    if dtype:
+        np.save(os.path.join(out_dir, COL_PATHS[col_name]), col_array.astype(dtype))
+    else:
+        np.save(os.path.join(out_dir, COL_PATHS[col_name]), col_array)
 
 
 def extract_destabilize(feature_matrix: np.ndarray)->np.ndarray:
@@ -178,7 +173,7 @@ def extract_destabilize(feature_matrix: np.ndarray)->np.ndarray:
     """
     # get signs of each element in matrix (0 will get nan).
     # Note that nan != nan, and this works with our definition since we don't destabilizing involves only non-zeros
-    with np.errstate(divide="ignore"):
+    with np.errstate(divide="ignore", invalid="ignore"):
         signs = feature_matrix/np.abs(feature_matrix)
 
     # get booleans of whether all columns have same sign value as 1st (i.e. all same sign)
@@ -199,6 +194,7 @@ def generate_feature_files(window_size:float,
                            out_dir:str)->int:
     """
     Extract basic features columns from raw data and saving them to disk
+    :author: Yonglin Wang, Jie Tang
     :param window_size: time length of data used for training, in seconds
     :param time_ahead: time in advance to predict, in seconds
     :param sampling_rate: sampling rate in each window
@@ -350,7 +346,7 @@ def generate_feature_files(window_size:float,
 
     # record expected length
     expected_length = len(label_list)
-    # save column as .npy files
+    # save column as .npy files, if disk is a concern in future, specify dtype in save_col
     [save_col(value, col_name, out_dir, expect_len=expected_length)
      for value, col_name in [(vel_ori_list, "velocity"), (vel_cal_list, "velocity_cal"),
                              (position_list, "position"), (joystick_list, "joystick"),
@@ -394,11 +390,12 @@ def broadcast_to_sampled(arr: np.ndarray, arr_sampled: np.ndarray)->np.ndarray:
     :param arr_sampled: sampled array of shape (n, sampling_rate, sampled_features)
     :return: combined array of (n, sampling_rate, sampled_features + 1), with broadcast array at the end of sampled entry
     """
-    # TODO allow list of cols via np.broadcast_to(arr4.reshape(-1,1), arr1.shape).shape
-    pass
 
+    # broad cast new array to desired size, shape (n, sampling_rate)
+    arr_aligned = np.broadcast_to(arr.reshape(-1, 1), arr_sampled.shape[:2])
 
-
+    # append new data to sampled data and return
+    return np.dstack(arr_sampled, arr_aligned)
 
 
 if __name__ == "__main__":
@@ -439,4 +436,4 @@ if __name__ == "__main__":
                            sampling_rate=args.rate,
                            time_gap=args.gap,
                            time_step=args.rolling,
-                           out_dir="data/default_test_{}window_{}ahead_{}rolling/".format(args.window, args.ahead, args.rolling))
+                           out_dir="data/default_test_{}window_{}ahead_{}rolling/".format(int(args.window*1000), int(args.ahead*1000), int(args.rolling*1000)))
