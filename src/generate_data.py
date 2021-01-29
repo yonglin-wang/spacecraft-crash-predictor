@@ -90,8 +90,6 @@ def sliding_window(interval_series:pd.Series, time_scale:float, rolling_step:flo
     left_bound = interval_series.iloc[0]
     right_bound = left_bound + time_scale
 
-    # entry_index = 0
-
     # Iterate over input series by rolling step to extract all possible time points within given scale.
     # Stop iteration once right bound is out of given interval.
     # for entry_index
@@ -127,9 +125,9 @@ def interpolate_entries(entries,
     interpolate specified columns in given rows ordered by time
     :param entries: dataframe of entries ordered by time
     :param sampling_rate: data points after interpolation
-    :param cols_to_interpolate:
-    :param x_col:
-    :return:
+    :param cols_to_interpolate: entry columns to interpolate, will use default if not set
+    :param x_col: column used as x axis for all interpolation
+    :return: dictionary of interpolated results, indexed by column name in entries
     """
     if cols_to_interpolate is None:
         cols_to_interpolate = COLS_TO_INTERPOLATE  # does not include seconds
@@ -193,12 +191,12 @@ def extract_destabilize(feature_matrix: np.ndarray)->np.ndarray:
     return np.equal(same_sign.sum(axis=1), num_feats)
 
 
-def preprocess_data(window_size:float,
-                    time_ahead:float,
-                    sampling_rate:int,
-                    time_gap:float,
-                    time_step:float,
-                    out_dir:str):
+def generate_feature_files(window_size:float,
+                           time_ahead:float,
+                           sampling_rate:int,
+                           time_gap:float,
+                           time_step:float,
+                           out_dir:str)->int:
     """
     Extract basic features columns from raw data and saving them to disk
     :param window_size: time length of data used for training, in seconds
@@ -207,9 +205,24 @@ def preprocess_data(window_size:float,
     :param time_gap: minimal length of time allowed between two crash events for sliding windows extraction
     :param time_step: the step to move window ahead in sliding window
     :param out_dir: output directory to save all features to
+    :return: total number of samples generated
     """
     # record time used for preprocessing
     begin = time.time()
+
+    # print training stats
+    print("Feature generation settings: \n"
+          "Window size: {}s\n"
+          "Time ahead: {}s\n"
+          "Sampling rate: {}\n"
+          "Time gap: {}s\n"
+          "Rolling step: {}s\n"
+          "Output directory: {}".format(window_size,
+                                        time_ahead,
+                                        sampling_rate,
+                                        time_gap,
+                                        time_step,
+                                        out_dir))
 
     # initial settings (to be moved)
     # np.set_printoptions(suppress=True)
@@ -305,8 +318,6 @@ def preprocess_data(window_size:float,
                         ex_crash = trial_raw_data[trial_raw_data.seconds == crash_time]
                         ex_crash["entries_since_last_crash"] = len(entries_for_train)
                         excluded_crashes_too_few = pd.concat([excluded_crashes_too_few, ex_crash])
-                        # # Get copy of current len = 1 or 0 entry
-                        # lone_entry_copy = entries_for_train.copy()
 
                     ### (2/2) Extract Noncrash Events in each group
 
@@ -355,10 +366,10 @@ def preprocess_data(window_size:float,
           "{} crashes excluded due to following last crash in less than {}s\n"
           "{} crashes excluded due to having fewer than {} entries since last crash\n"
           "{} crashes included in training data\n".format(
-        len(excluded_crashes_too_close) + len(excluded_crashes_too_few) + len(label_list),
+        len(excluded_crashes_too_close) + len(excluded_crashes_too_few) + sum(label_list),
         len(excluded_crashes_too_close), time_gap,
         len(excluded_crashes_too_few), MIN_ENTRIES_IN_WINDOW,
-        len(label_list)))
+        sum(label_list)))
 
     # record excluded entries for analysis
     debug_base = DEBUG_FORMAT.format(int(time_ahead*1000), int(window_size*1000))
@@ -367,10 +378,13 @@ def preprocess_data(window_size:float,
     all_valid_crashes.to_csv(os.path.join(out_dir, "all_valid_crashes_" + debug_base), index=False)
 
     print("Total crash samples: {}\n"
-          "Total noncrash samples: {}".format(label_list.count(1), label_list.count(0)))
+          "Total noncrash samples: {}\n"
+          "Total sample size".format(label_list.count(1), label_list.count(0), len(label_list)))
 
     print("Feature generation done!")
     display_exec_time(begin, scr_name=__file__)
+
+    return expected_length
 
 
 def broadcast_to_sampled(arr: np.ndarray, arr_sampled: np.ndarray)->np.ndarray:
@@ -420,9 +434,9 @@ if __name__ == "__main__":
         args.gap = (2 * args.window + args.ahead)
 
     # generate feature files, for debug only
-    preprocess_data(window_size=args.window,
-                    time_ahead=args.ahead,
-                    sampling_rate=args.rate,
-                    time_gap=args.gap,
-                    time_step=args.rolling,
-                    out_dir="data/default_test_{}window_{}ahead_{}rolling/".format(args.window, args.ahead, args.rolling))
+    generate_feature_files(window_size=args.window,
+                           time_ahead=args.ahead,
+                           sampling_rate=args.rate,
+                           time_gap=args.gap,
+                           time_step=args.rolling,
+                           out_dir="data/default_test_{}window_{}ahead_{}rolling/".format(args.window, args.ahead, args.rolling))
