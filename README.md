@@ -1,4 +1,6 @@
-# Space-Health-Predicting
+# Spacecraft Crash Predictor
+
+This project aims to build a classifier that predicts spacecraft crashes in advance. Special thanks to Jie Tang, some of whose [code logic for the same task](https://github.com/TJmask/Space-Health-Predicting) has been especially helpful in building this project; Jie's name will be included the docstring sections of the functions, wherever credit is due. 
 
 # How to Add New Code
 ## Code for Extracting New Feature
