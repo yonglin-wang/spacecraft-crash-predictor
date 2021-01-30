@@ -1,12 +1,8 @@
 import os
-import glob
 import pickle
 
 import pandas as pd
 import numpy as np
-import scipy as sp
-from scipy.interpolate import interp1d
-from datetime import timedelta
 import time
 # import matplotlib.pyplot as plt
 # import warnings
@@ -14,23 +10,16 @@ import time
 import keras
 from keras.preprocessing import sequence
 import tensorflow as tf
-from keras.models import Sequential
-from keras.layers import Dense
-from keras.layers import LSTM
-from keras.utils import to_categorical
 
-from keras.optimizers import Adam
-from keras.models import load_model
-from keras.callbacks import ModelCheckpoint
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 
 # assertion packages
-from tensorflow.python.client import device_lib
-from keras.backend import tensorflow_backend
 
 from utils import display_exec_time
+from processing.marsdataloader import MARSDataLoader
+
 import argparse
 
 # Control for random states
@@ -62,7 +51,7 @@ argparser = argparse.ArgumentParser(prog="LSTM Trainer Argparser",
                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 argparser.add_argument(
-    '--scale', type=float, default=1.0, help='time scale of training data, in seconds')
+    '--window', type=float, default=1.0, help='time scale of training data, in seconds')
 argparser.add_argument(
     '--ahead', type=float, default=0.5, help='prediction timing ahead of event, in seconds')
 argparser.add_argument(
@@ -78,7 +67,7 @@ argparser.add_argument(
 args = argparser.parse_args()
 
 # convert seconds to ms
-scale_ms = int(args.scale * 1000)
+window_ms = int(args.window * 1000)
 ahead_ms = int(args.ahead * 1000)
 use_calculated = args.cal_vel
 early_stopping = args.early_stop
@@ -87,7 +76,7 @@ conv_criteria = args.conv_crit
 
 # print training info
 print("Training information:")
-print(f"Now training model with {scale_ms}ms scale, {ahead_ms}ms ahead.\n"
+print(f"Now training model with {window_ms}ms scale, {ahead_ms}ms ahead.\n"
       f"Using calculated weight? {use_calculated}\n"
       f"Early Stopping? {early_stopping}\n")
 
@@ -107,6 +96,9 @@ if use_calculated:
 
 ### time the script
 begin = time.time()
+
+# TODO start change here: set window - ahead - rolling as positional arguments instead!
+# loader = MARSDataLoader(args.window, args.ahead, args.)
 
 def load_sets_after_split(ahead_ms, scale_ms, mode=ORIGINAL):
     if mode not in (CALCULATED, ORIGINAL):
@@ -128,22 +120,22 @@ def save_sets_after_split(X_train, X_test, y_train, y_test, ahead_ms, scale_ms, 
 
 # Now, save model and training stats
 # ensure output folder exists
-if not os.path.exists(f"results/results_{scale_ms}"):
-    os.makedirs(f'results/results_{scale_ms}')
+if not os.path.exists(f"results/results_{window_ms}"):
+    os.makedirs(f'results/results_{window_ms}')
 
 try:
     if use_calculated:
-        X_train, X_test, y_train, y_test = load_sets_after_split(ahead_ms, scale_ms, mode=CALCULATED)
+        X_train, X_test, y_train, y_test = load_sets_after_split(ahead_ms, window_ms, mode=CALCULATED)
     else:
-        X_train, X_test, y_train, y_test = load_sets_after_split(ahead_ms, scale_ms)
+        X_train, X_test, y_train, y_test = load_sets_after_split(ahead_ms, window_ms)
 
 except:
     print("did not find train and test files... now generating...")
     #### read all the positive samples TODO merge these paths with generate data (use 1 var and avoid hard coding)
-    crash_featurized = pd.read_pickle(f'data/data_{scale_ms}ms/crash_feature_label_{ahead_ms}ahead_{scale_ms}scale_test')
+    crash_featurized = pd.read_pickle(f'data/data_{window_ms}ms/crash_feature_label_{ahead_ms}ahead_{window_ms}scale_test')
 
     ### read all the negative samples
-    noncrash_featurized = pd.read_pickle(f'data/data_{scale_ms}ms/noncrash_feature_label_{ahead_ms}ahead_{scale_ms}scale_test')
+    noncrash_featurized = pd.read_pickle(f'data/data_{window_ms}ms/noncrash_feature_label_{ahead_ms}ahead_{window_ms}scale_test')
 
     #### merge both positive and negative together
     data_final = pd.concat([crash_featurized, noncrash_featurized])
@@ -177,9 +169,9 @@ except:
     X_train, X_test, y_train, y_test = train_test_split(X_all, y_all, test_size=0.2, random_state=SEED)
 
     if use_calculated:
-        save_sets_after_split(X_train, X_test, y_train, y_test, ahead_ms, scale_ms, mode=CALCULATED)
+        save_sets_after_split(X_train, X_test, y_train, y_test, ahead_ms, window_ms, mode=CALCULATED)
     else:
-        save_sets_after_split(X_train, X_test, y_train, y_test, ahead_ms, scale_ms)
+        save_sets_after_split(X_train, X_test, y_train, y_test, ahead_ms, window_ms)
 
 print("X_train shape: {}".format(X_train.shape))
 print("y_train shape: {}".format(y_train.shape))
@@ -215,6 +207,7 @@ print("X_train shape: {}".format(X_train.shape))
 print("y_train shape: {}".format(y_train.shape))
 print("X_test shape: {}".format(X_test.shape))
 print("y_test shape: {}".format(y_test.shape))
+
 
 ### train model
 
@@ -298,11 +291,11 @@ for i in range(len(class_weights)):
 
 
     # save model to path, can be loaded with, e.g., reconstructed_model = keras.models.load_model(path_to_folder)
-    model.save(f'results/results_{scale_ms}/{scale_ms}scale_{ahead_ms}ahead_{class_weights[i][0]}to{class_weights[i][1]}_model_orig_vel')
+    model.save(f'results/results_{window_ms}/{window_ms}scale_{ahead_ms}ahead_{class_weights[i][0]}to{class_weights[i][1]}_model_orig_vel')
     # save test set stats
-    df_resutls.to_csv(f'results/results_{scale_ms}/{scale_ms}scale_{ahead_ms}ahead_{class_weights[i][0]}to{class_weights[i][1]}_stats_orig_vel.csv')
+    df_resutls.to_csv(f'results/results_{window_ms}/{window_ms}scale_{ahead_ms}ahead_{class_weights[i][0]}to{class_weights[i][1]}_stats_orig_vel.csv')
     # pickle model training history
-    pickle.dump(history, open(f'results/results_{scale_ms}/{scale_ms}scale_{ahead_ms}ahead_{class_weights[i][0]}to{class_weights[i][1]}_history_orig_vel.pkl', "wb"))
+    pickle.dump(history, open(f'results/results_{window_ms}/{window_ms}scale_{ahead_ms}ahead_{class_weights[i][0]}to{class_weights[i][1]}_history_orig_vel.pkl', "wb"))
 
 display_exec_time(begin, scr_name="model.py")
     # print(predictions_cal.shape, testing_cal.shape)

@@ -2,12 +2,9 @@
 # -*- coding: utf-8 -*-
 # Author: Yonglin Wang
 # Date: 2021/1/27
-# This script includes:
-# - Functions for extracting and saving feature numpy arrays
-# - All feature processing related static values for other scripts to read from
+# Functions for extracting and saving feature numpy arrays
 
 import os
-import glob
 import time
 import pandas as pd
 import numpy as np
@@ -19,42 +16,17 @@ from tqdm import tqdm
 
 import argparse
 import random
-from collections import OrderedDict
 
 from utils import display_exec_time
-
-# names to save each column under, original data if no "calculated" or "normalized" specified in file path
-# In principle,if the directory is not tampered, the following arrays should all have shape (n, [sampling_rate])
-COL_PATHS = OrderedDict({"velocity": "velocity.npy",            # training, (n_sample, sampling_rate)
-             "velocity_cal": "velocity_calculated.npy",         # training, (n_sample, sampling_rate)
-             "position": "position.npy",                        # training, (n_sample, sampling_rate)
-             "joystick": "joystick_deflection.npy",             # training, (n_sample, sampling_rate)
-             "destabilizing": "destabilizing_deflection.npy",   # training, (n_sample, sampling_rate)
-             "label": "label.npy",                              # truth label. 1=crash, 0=noncrash
-             "trial_key": "corresponding_peopleTrialKey.npy",   # for output reference only
-             "start_seconds": "entry_start_seconds.npy",        # can be added as feature?
-             "end_seconds": "entry_end_seconds.npy"             # can be added as feature?
-             })
+import consts as C
 
 # control for randomness in case of any
 RANDOM_SEED = 2020
-np.random.seed(seed=RANDOM_SEED)
+np.random.seed(RANDOM_SEED)
 random.seed(RANDOM_SEED)
 
-# argparser value checker
-MIN_STEP = 0.04
 
-# crash event criteria
-MIN_ENTRIES_IN_WINDOW = 2     # minimum # of entries between two crash events (i.e. in a window)
-
-# paths for saving output
-DEBUG_FORMAT = "debug_{}ahead_{}scale_test.csv"
-
-# columns we will use for interpolation
-COLS_TO_INTERPOLATE = ('currentVelRoll', 'currentPosRoll', 'calculated_vel', 'joystickX')
-
-
-def sliding_window(interval_series:pd.Series, time_scale:float, rolling_step:float, avoid_duplicate=False) -> list:
+def sliding_window(interval_series: pd.Series, time_scale: float, rolling_step: float, avoid_duplicate=False) -> list:
     """
     Identify extractable valid window boundaries (inclusive) in given slice of the seconds column.
     Valid window is defined as window that contains and only contains more than 1 non-crash events.
@@ -66,8 +38,7 @@ def sliding_window(interval_series:pd.Series, time_scale:float, rolling_step:flo
     :return: tuples of valid start and end of valid windows, in seconds
     """
     # precondition: rolling step must be larger than this to avoid duplicate windows
-    if rolling_step < MIN_STEP:
-        raise ValueError("Rolling step length must be greater than {} seconds".format(MIN_STEP))
+    assert rolling_step >= C.MIN_STEP, "Rolling step length must be greater than {} seconds".format(C.MIN_STEP)
 
     # keep track of valid series of timestamps
     valid_windows = []
@@ -89,7 +60,7 @@ def sliding_window(interval_series:pd.Series, time_scale:float, rolling_step:flo
         window_series = interval_series[interval_series.between(left_bound, right_bound)]
 
         # only keep unique windows with more than 1 data points
-        if len(window_series) >= MIN_ENTRIES_IN_WINDOW:
+        if len(window_series) >= C.MIN_ENTRIES_IN_WINDOW:
             # if specified, check for duplicate window to strictly avoid duplicate (time consuming)
             if avoid_duplicate:
                 # append if windows list empty
@@ -111,7 +82,7 @@ def sliding_window(interval_series:pd.Series, time_scale:float, rolling_step:flo
 def interpolate_entries(entries,
                         sampling_rate=50,
                         cols_to_interpolate=None,
-                        x_col="seconds")->dict:
+                        x_col="seconds") -> dict:
     """
     interpolate specified columns in given rows ordered by time
     :param entries: dataframe of entries ordered by time
@@ -121,7 +92,7 @@ def interpolate_entries(entries,
     :return: dictionary of interpolated results, indexed by column name in entries
     """
     if cols_to_interpolate is None:
-        cols_to_interpolate = COLS_TO_INTERPOLATE  # does not include seconds
+        cols_to_interpolate = C.COLS_TO_INTERPOLATE  # does not include seconds
 
     # get x axis for interpolating
     x = entries[x_col]
@@ -134,7 +105,7 @@ def interpolate_entries(entries,
     return output
 
 
-def save_col(col_array:Union[list, np.ndarray], col_name:str, out_dir:str, expect_len=-1, dtype=None):
+def save_col(col_array: Union[list, np.ndarray], col_name: str, out_dir: str, expect_len=-1, dtype=None):
     """
     save array as numpy .npy file
     :param col_array: list or ndarray to be saved
@@ -144,8 +115,7 @@ def save_col(col_array:Union[list, np.ndarray], col_name:str, out_dir:str, expec
     :param dtype: dtype for numpy array to be saved, used to save space
     """
     # check if col_name correct
-    if col_name not in COL_PATHS:
-        raise ValueError("Cannot recognize column name {} in COL_PATHS".format(col_name))
+    assert col_name in C.COL_PATHS, "Cannot recognize column name {} in COL_PATHS".format(col_name)
 
     # check length if needed
     if expect_len > -1:
@@ -159,12 +129,12 @@ def save_col(col_array:Union[list, np.ndarray], col_name:str, out_dir:str, expec
 
     # save to given output directory
     if dtype:
-        np.save(os.path.join(out_dir, COL_PATHS[col_name]), col_array.astype(dtype))
+        np.save(os.path.join(out_dir, C.COL_PATHS[col_name]), col_array.astype(dtype))
     else:
-        np.save(os.path.join(out_dir, COL_PATHS[col_name]), col_array)
+        np.save(os.path.join(out_dir, C.COL_PATHS[col_name]), col_array)
 
 
-def extract_destabilize(feature_matrix: np.ndarray)->np.ndarray:
+def extract_destabilize(feature_matrix: np.ndarray) -> np.ndarray:
     """
     generate destabilization column based on the base feature matrix of (sampling_rate, 3).
     Destabilizing is defined as all 3 basic features 1) are non zero and 2) have same direction (i.e. sign)
@@ -174,7 +144,7 @@ def extract_destabilize(feature_matrix: np.ndarray)->np.ndarray:
     # get signs of each element in matrix (0 will get nan).
     # Note that nan != nan, and this works with our definition since we don't destabilizing involves only non-zeros
     with np.errstate(divide="ignore", invalid="ignore"):
-        signs = feature_matrix/np.abs(feature_matrix)
+        signs = feature_matrix / np.abs(feature_matrix)
 
     # get booleans of whether all columns have same sign value as 1st (i.e. all same sign)
     # same_sign shape: (sampling_rate, 3)
@@ -186,12 +156,12 @@ def extract_destabilize(feature_matrix: np.ndarray)->np.ndarray:
     return np.equal(same_sign.sum(axis=1), num_feats)
 
 
-def generate_feature_files(window_size:float,
-                           time_ahead:float,
-                           sampling_rate:int,
-                           time_gap:float,
-                           time_step:float,
-                           out_dir:str)->int:
+def generate_feature_files(window_size: float,
+                           time_ahead: float,
+                           sampling_rate: int,
+                           time_gap: float,
+                           time_step: float,
+                           out_dir: str) -> int:
     """
     Extract basic features columns from raw data and saving them to disk
     :author: Yonglin Wang, Jie Tang
@@ -227,7 +197,7 @@ def generate_feature_files(window_size:float,
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
-    ### output and helper functions
+    # #### output and helper functions
     # lists to convert to np for save, each of length n_samples
     vel_ori_list = []
     vel_cal_list = []
@@ -238,9 +208,9 @@ def generate_feature_files(window_size:float,
     start_list = []
     end_list = []
 
-    def process_entries(entries_for_train, trial_key:str, label:int):
+    def process_entries(entries_for_inter, trial_key: str, label: int):
         """helper function to interpolate entries and record output"""
-        int_results = interpolate_entries(entries_for_train, sampling_rate=sampling_rate)
+        int_results = interpolate_entries(entries_for_inter, sampling_rate=sampling_rate)
 
         vel_ori_list.append(int_results["currentVelRoll"])
         vel_cal_list.append(int_results["calculated_vel"])
@@ -248,13 +218,14 @@ def generate_feature_files(window_size:float,
         joystick_list.append(int_results["joystickX"])
         label_list.append(label)
         trial_key_list.append(trial_key)
-        start_list.append(entries_for_train['seconds'].iloc[0])
-        end_list.append(entries_for_train['seconds'].iloc[-1])
+        start_list.append(entries_for_inter['seconds'].iloc[0])
+        end_list.append(entries_for_inter['seconds'].iloc[-1])
 
-    ### load raw data
+    # #### load raw data
     # extract all needed columns
-    raw_data = pd.read_csv('data/data_all.csv', usecols=['seconds', 'trialPhase', 'currentPosRoll', 'currentVelRoll', 'calculated_vel',
-                  'joystickX', 'peopleTrialKey'])
+    raw_data = pd.read_csv('data/data_all.csv',
+                           usecols=['seconds', 'trialPhase', 'currentPosRoll', 'currentVelRoll', 'calculated_vel',
+                                    'joystickX', 'peopleTrialKey'])
 
     # filter out non-human controls in data
     raw_data = raw_data[raw_data.trialPhase != 1]
@@ -262,7 +233,7 @@ def generate_feature_files(window_size:float,
     # get unique peopleTrialKeys that have crashes for skipping no-crash trials
     crash_keys_all = set(raw_data[raw_data.trialPhase == 4].peopleTrialKey.unique())
 
-    ### initialize auxiliary objects for debugging
+    # #### initialize auxiliary objects for debugging
     # record crash events that are not too short from the previous crash
     all_valid_crashes = pd.DataFrame()
 
@@ -272,7 +243,7 @@ def generate_feature_files(window_size:float,
 
     print("Total number of trials to process: {}".format(len(crash_keys_all)))
 
-    ### iterate through trials to process extract features
+    # #### iterate through trials to process extract features
     with tqdm(total=raw_data.peopleTrialKey.nunique()) as pbar:
         # extract crash events features from each trial
         for current_trial_key, trial_raw_data in raw_data.groupby("peopleTrialKey"):
@@ -281,10 +252,12 @@ def generate_feature_files(window_size:float,
                 # find all crash data points in this trial
                 crashes_this_trial = trial_raw_data[trial_raw_data.trialPhase == 4]
 
-                # Calculate each crash event's elapsed time since last crash (defined as difference since 0 for first crash)
-                # Using assign to create new columns without evoking SettingWithCopyWarning
-                crashes_this_trial = crashes_this_trial.assign(preceding_crash_seconds=crashes_this_trial.seconds.shift(1, fill_value=0))
-                crashes_this_trial = crashes_this_trial.assign(seconds_since_last_crash=crashes_this_trial.seconds - crashes_this_trial.preceding_crash_seconds)
+                # Calculate each crash event's elapsed time since last crash (defined as difference since 0 for first
+                # crash) Using assign to create new columns without evoking SettingWithCopyWarning
+                crashes_this_trial = crashes_this_trial.assign(
+                    preceding_crash_seconds=crashes_this_trial.seconds.shift(1, fill_value=0))
+                crashes_this_trial = crashes_this_trial.assign(
+                    seconds_since_last_crash=crashes_this_trial.seconds - crashes_this_trial.preceding_crash_seconds)
 
                 # Keep only crash events longer than given time gap away since last (NOT sliding window yet!)
                 valid_crash_entries = crashes_this_trial[crashes_this_trial["seconds_since_last_crash"] > time_gap]
@@ -299,13 +272,13 @@ def generate_feature_files(window_size:float,
                 # iterate through each valid crash to create data entry
                 for crash_time in valid_crash_entries.seconds:
 
-                    ### (1/2) Extract Crash Events in each group
+                    # ### (1/2) Extract Crash Events in each group
                     # find corresponding data points between time scale start and crash event to generate training data
                     entries_for_train = trial_raw_data[trial_raw_data.seconds.between(
                         crash_time - window_size - time_ahead, crash_time - time_ahead)]
 
                     # only process entries with more than one data points
-                    if len(entries_for_train) >= MIN_ENTRIES_IN_WINDOW:
+                    if len(entries_for_train) >= C.MIN_ENTRIES_IN_WINDOW:
                         # resample & interpolate
                         process_entries(entries_for_train, current_trial_key, 1)
 
@@ -315,16 +288,19 @@ def generate_feature_files(window_size:float,
                         ex_crash["entries_since_last_crash"] = len(entries_for_train)
                         excluded_crashes_too_few = pd.concat([excluded_crashes_too_few, ex_crash])
 
-                    ### (2/2) Extract Noncrash Events in each group
-
+                    # ### (2/2) Extract Noncrash Events in each group
                     # find bounds to perform sliding window
                     # left bound: last crash time of current valid crash, safe to use [0] since seconds are unique
-                    left = valid_crash_entries["preceding_crash_seconds"].loc[valid_crash_entries.seconds == crash_time].iloc[0]
+                    left = \
+                        valid_crash_entries["preceding_crash_seconds"].loc[
+                            valid_crash_entries.seconds == crash_time].iloc[
+                            0]
                     # right bound: crash interval ahead of current crash
                     right = crash_time - window_size - time_ahead
 
                     # crucially not include left boundary (last crash entry)
-                    sliding_series = trial_raw_data.seconds[(trial_raw_data.seconds > left) & (trial_raw_data.seconds <= right)]
+                    sliding_series = trial_raw_data.seconds[
+                        (trial_raw_data.seconds > left) & (trial_raw_data.seconds <= right)]
 
                     # run sliding window on noncrash event
                     all_windows = sliding_window(sliding_series, window_size, time_step)
@@ -341,7 +317,7 @@ def generate_feature_files(window_size:float,
             # update progress bar
             pbar.update(1)
 
-    ### Save feature output
+    # #### Save feature output
     print("Processing done! \nNow validating and saving features to \"{}\"...".format(out_dir), end="")
 
     # record expected length
@@ -356,19 +332,20 @@ def generate_feature_files(window_size:float,
 
     print("Done!\n")
 
-    ### For debugging
+    # #### For debugging
     # report crash event stats
     print("Total crashes in all raw data: {}\n"
           "{} crashes excluded due to following last crash in less than {}s\n"
           "{} crashes excluded due to having fewer than {} entries since last crash\n"
-          "{} crashes included in training data\n".format(
-        len(excluded_crashes_too_close) + len(excluded_crashes_too_few) + sum(label_list),
-        len(excluded_crashes_too_close), time_gap,
-        len(excluded_crashes_too_few), MIN_ENTRIES_IN_WINDOW,
-        sum(label_list)))
+          "{} crashes included in training data\n".format(len(excluded_crashes_too_close) +
+                                                          len(excluded_crashes_too_few) +
+                                                          sum(label_list), len(excluded_crashes_too_close),
+                                                          time_gap,
+                                                          len(excluded_crashes_too_few), C.MIN_ENTRIES_IN_WINDOW,
+                                                          sum(label_list)))
 
     # record excluded entries for analysis
-    debug_base = DEBUG_FORMAT.format(int(time_ahead*1000), int(window_size*1000))
+    debug_base = C.DEBUG_FORMAT.format(int(time_ahead * 1000), int(window_size * 1000))
     excluded_crashes_too_close.to_csv(os.path.join(out_dir, "too_close_to_last_" + debug_base), index=False)
     excluded_crashes_too_few.to_csv(os.path.join(out_dir, "too_few_between_" + debug_base), index=False)
     all_valid_crashes.to_csv(os.path.join(out_dir, "all_valid_crashes_" + debug_base), index=False)
@@ -383,12 +360,13 @@ def generate_feature_files(window_size:float,
     return expected_length
 
 
-def broadcast_to_sampled(arr: np.ndarray, arr_sampled: np.ndarray)->np.ndarray:
+def broadcast_to_sampled(arr: np.ndarray, arr_sampled: np.ndarray) -> np.ndarray:
     """
     append non-sampled array to a sampled array for generating training input
-    :param arr: non-sampled array to broadcast of (n, )
+    :param arr: non-sampled array of (n, ) to broadcast to (n.sampling_rate)
     :param arr_sampled: sampled array of shape (n, sampling_rate, sampled_features)
-    :return: combined array of (n, sampling_rate, sampled_features + 1), with broadcast array at the end of sampled entry
+    :return:
+    combined array of (n, sampling_rate, sampled_features + 1), with broadcast array at the end of sampled entry
     """
 
     # broad cast new array to desired size, shape (n, sampling_rate)
@@ -404,7 +382,8 @@ if __name__ == "__main__":
                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     argparser.add_argument(
-        '--window', type=float, default=1.0, help='size of sliding window to generate non-crash training data, in seconds')
+        '--window', type=float, default=1.0,
+        help='size of sliding window to generate non-crash training data, in seconds')
     argparser.add_argument(
         '--ahead', type=float, default=0.5, help='prediction timing ahead of event, in seconds')
     argparser.add_argument(
@@ -420,8 +399,8 @@ if __name__ == "__main__":
     print(f"current working directory: {os.getcwd()}")
 
     # check for minimal rolling step
-    if args.rolling < MIN_STEP:
-        raise argparse.ArgumentTypeError("Rolling step must be smaller than {}".format(MIN_STEP))
+    if args.rolling < C.MIN_STEP:
+        raise argparse.ArgumentTypeError("Rolling step must be smaller than {}".format(C.MIN_STEP))
 
     # Ensure gap large enough to accommodate data extraction.
     # Time gap is used to exclude those consecutive crash events happened within less than this length.
@@ -436,4 +415,6 @@ if __name__ == "__main__":
                            sampling_rate=args.rate,
                            time_gap=args.gap,
                            time_step=args.rolling,
-                           out_dir="data/default_test_{}window_{}ahead_{}rolling/".format(int(args.window*1000), int(args.ahead*1000), int(args.rolling*1000)))
+                           out_dir="data/default_test_{}window_{}ahead_{}rolling/".format(int(args.window * 1000),
+                                                                                          int(args.ahead * 1000),
+                                                                                          int(args.rolling * 1000)))
