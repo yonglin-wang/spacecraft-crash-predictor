@@ -27,13 +27,17 @@ class MARSDataLoader():
                  time_ahead=0.5,
                  sampling_rate=50,
                  time_gap=5,
-                 rolling_step=0.5,
+                 rolling_step=0.7,
                  verbose=True
                  ):
 
         # ensure time_gap has the right size
         if time_gap < (2 * window_size + time_ahead):
             time_gap = 2 * window_size + time_ahead
+
+        # ensure rolling step is not too small
+        if rolling_step <= C.MIN_STEP:
+            raise ValueError("Rolling step {} is smaller than the minimal length {}".format(rolling_step, C.MIN_STEP))
 
         # record dataset info, all time in seconds
         self.window = window_size
@@ -53,9 +57,9 @@ class MARSDataLoader():
                                                      self.ahead_ms,
                                                      self.rolling_ms)
         # record directory to save loader and models
-        self.exp_dir = C.EXP_OUT_DIR_FORMAT.format(self.window_ms,
-                                                   self.ahead_ms,
-                                                   self.rolling_ms)
+        # self.exp_dir = C.EXP_OUT_DIR_FORMAT.format(self.window_ms,
+        #                                            self.ahead_ms,
+        #                                            self.rolling_ms)
 
         # ensure all features in COL_PATH, and regenerate all features
         missing_feats = self.__missing_feature_files()
@@ -81,13 +85,16 @@ class MARSDataLoader():
             if "destabilizing" in missing_non_init:
                 self.__save_new_feature(extract_destabilize(self.basic_triples()), "destabilizing")
 
-        # record sample size, assuming all columns have equal lengths
-        self.n = self.retrieve_col("label").shape[0]
+        # record sample size, assuming all columns have equal lengths (as they should)
+        labels = self.retrieve_col("label")
+        self.total_sample_size = labels.shape[0]
+        self.crash_sample_size = np.sum(labels==1)
+        self.noncrash_sample_size = np.sum(labels==0)
 
     def __save_new_feature(self, generated_col: np.ndarray, col_name: str):
         """internal helper for validating and creating new feature and checking spelling"""
         assert col_name in C.COL_PATHS, "cannot recognize column name {} in COL_PATHS. " \
-                                        "Following README.md to add new features".format(col_name)
+                                        "To add new features, follow README.md ".format(col_name)
         self._save_col(generated_col, col_name)
 
     def _save_col(self, col, col_name):
@@ -103,13 +110,13 @@ class MARSDataLoader():
         """
         return os.path.join(self.data_dir, basename)
 
-    def exp_file_path(self, basename: str) -> str:
-        """
-        helper function to return save path for given file under exp/
-        :param basename: basename of file
-        :return: joined path
-        """
-        return os.path.join(self.exp_dir, basename)
+    # def exp_file_path(self, basename: str) -> str:
+    #     """
+    #     helper function to return save path for given file under exp/
+    #     :param basename: basename of file
+    #     :return: joined path
+    #     """
+    #     return os.path.join(self.exp_dir, basename)
 
     def __missing_feature_files(self) -> set:
         """
@@ -149,8 +156,6 @@ class MARSDataLoader():
         position = self.retrieve_col("position")
         joystick = self.retrieve_col("joystick")
 
-        # TODO add normalize and standardize handle?
-
         # return d-stacked array (n, sample_rate, 3)
         return np.dstack([velocity, position, joystick])
 
@@ -171,20 +176,25 @@ class MARSDataLoader():
         except FileNotFoundError:
             raise FileNotFoundError("Cannot find column array file {}".format(col_path))
 
-    def retrieve_all_cols(self) -> OrderedDict:
+    def retrieve_all_cols(self, inds: Union[list, np.ndarray]=None) -> OrderedDict:
         """
         retrieve all columns with shape (n, ...) listed in COL_PATHS
+        :param inds: list of indices to slice column from, if given
         :return: dictionary of arrays indexed by column names
         """
         output = OrderedDict()
 
-        for col_name in C.COL_PATHS:
-            output[col_name] = self.retrieve_col(col_name)
+        if inds is not None:
+            for col_name in C.COL_PATHS:
+                output[col_name] = self.retrieve_col_slices(col_name, inds=inds)
+        else:
+            for col_name in C.COL_PATHS:
+                output[col_name] = self.retrieve_col(col_name)
 
         return output
 
     def retrieve_col_slices(self, col_name: str, inds: Union[list, np.ndarray]) -> np.ndarray:
-        """helper function to retrieve elements of a given column"""
+        """helper function to retrieve elements of a column given an array of indices"""
         assert col_name in C.COL_PATHS, "Cannot find column name {} in columns listed in COL_PATHS.".format(col_name)
 
         # load array
@@ -194,30 +204,28 @@ class MARSDataLoader():
         return col_array[inds]
 
 
-#
-# def retrieve_loader_with(window: float,
-#                          ahead: float,
-#                          rolling: float)->MARSDataLoader:
-#     """retrieve loader with given configuration"""
-#     try:
-#         pickle.load(os.path.join(C.DATA_OUT_DIR_FORMAT, ))
-
-
-def generate_all_feat_df(loader, used_col=None) -> pd.DataFrame:
+def generate_all_feat_df(loader:MARSDataLoader, config_id: int, inds: Union[list, np.ndarray]=None) -> pd.DataFrame:
     """
     generate DataFrame containing all np columns, while changing name of used columns to USED_COL_FORMAT
     :param loader: MARSDataLoader to retrieve np columns from
-    :param used_col: list of columns to be marked used
+    :param config_id: dataset configuration ID
+    :param inds: list of indices of data to retrieve, if not retrieving all
     :return: DataFrame containing all raw feat columns, name of used columns to USED_COL_FORMAT
     """
 
     # generate DataFrame
     output = pd.DataFrame()
-    feat_cols = loader.retrieve_all_cols()
+
+    if inds is not None:
+        feat_cols = loader.retrieve_all_cols(inds=inds)
+    else:
+        feat_cols = loader.retrieve_all_cols()
+
     for col_name, arr in feat_cols.items():
         output[col_name] = arr.tolist()
 
-    # change name
+    # change name of columns to label which ones are used
+    used_col = C.CONFIG_SPECS[config_id][C.COLS_USED]
     if used_col:
         __rename_used_cols(output, used_col)
 
@@ -231,5 +239,6 @@ def __rename_used_cols(df, train_cols: list):
 
 if __name__ == "__main__":
     from processing.dataset_config import load_splits
-    l = MARSDataLoader()
-    train_inds, test_inds, X_train, X_test, y_train, y_test = load_splits(l, 1)
+    loader = MARSDataLoader(window_size=2.0, time_ahead=1.0)
+    train_inds, test_inds, X_train, X_test, y_train, y_test = load_splits(loader, 1)
+    df = generate_all_feat_df(loader, 1, inds=test_inds)

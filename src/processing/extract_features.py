@@ -152,8 +152,8 @@ def extract_destabilize(feature_matrix: np.ndarray) -> np.ndarray:
 
     # sum up booleans, only destabilizing when all 3 columns in a row are true (i.e. row sums to 3)
     # return shape: (sampling_rate,)
-    num_feats = feature_matrix.shape[1]
-    return np.equal(same_sign.sum(axis=1), num_feats)
+    num_feats = feature_matrix.shape[2]
+    return np.equal(same_sign.sum(axis=2), num_feats)
 
 
 def generate_feature_files(window_size: float,
@@ -241,7 +241,8 @@ def generate_feature_files(window_size: float,
     excluded_crashes_too_close = pd.DataFrame()
     excluded_crashes_too_few = pd.DataFrame()
 
-    print("Total number of trials to process: {}".format(len(crash_keys_all)))
+    print("Total number of trials with crashes: {}"
+          "\nTotal number of trials: {}".format(len(crash_keys_all), raw_data.peopleTrialKey.nunique()))
 
     # #### iterate through trials to process extract features
     with tqdm(total=raw_data.peopleTrialKey.nunique()) as pbar:
@@ -285,7 +286,7 @@ def generate_feature_files(window_size: float,
                     else:
                         # print("Found a crash window with # of entries < {}!".format(MIN_ENTRIES_IN_WINDOW))
                         ex_crash = trial_raw_data[trial_raw_data.seconds == crash_time]
-                        ex_crash["entries_since_last_crash"] = len(entries_for_train)
+                        ex_crash = ex_crash.assign(entries_since_last_crash=len(entries_for_train))
                         excluded_crashes_too_few = pd.concat([excluded_crashes_too_few, ex_crash])
 
                     # ### (2/2) Extract Noncrash Events in each group
@@ -350,9 +351,12 @@ def generate_feature_files(window_size: float,
     excluded_crashes_too_few.to_csv(os.path.join(out_dir, "too_few_between_" + debug_base), index=False)
     all_valid_crashes.to_csv(os.path.join(out_dir, "all_valid_crashes_" + debug_base), index=False)
 
+    crash_total = label_list.count(1)
+    noncrash_total = label_list.count(0)
+
     print("Total crash samples: {}\n"
           "Total noncrash samples: {}\n"
-          "Total sample size".format(label_list.count(1), label_list.count(0), len(label_list)))
+          "Total sample size: {}".format(crash_total, noncrash_total, expected_length))
 
     print("Feature generation done!")
     display_exec_time(begin, scr_name=__file__)

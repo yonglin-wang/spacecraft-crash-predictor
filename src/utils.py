@@ -7,7 +7,7 @@
 import time
 
 
-def display_exec_time(begin: float, scr_name: str = ""):
+def display_exec_time(begin: float, scr_name: str = "") -> str:
     """Displays the execution time"""
     exec_time = time.time() - begin
 
@@ -16,7 +16,12 @@ def display_exec_time(begin: float, scr_name: str = ""):
         msg_header = scr_name.rstrip() + " " + msg_header
 
     if exec_time > 60:
-        et_m, et_s = int(exec_time / 60), int(exec_time % 60)
-        print("\n%s %dm %ds" % (msg_header, et_m, et_s))
+        min_str, sec_str = int(exec_time / 60), int(exec_time % 60)
+        time_str = "{}m {}s".format(min_str, sec_str)
+
     else:
-        print("\n%s %.2fs" % (msg_header, exec_time))
+        time_str = "{:.2f}s".format(exec_time)
+
+    print("{} {}".format(msg_header, time_str))
+
+    return time_str

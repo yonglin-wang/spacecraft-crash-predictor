@@ -38,6 +38,9 @@ def load_splits(loader: MARSDataLoader, config_id: int) -> Tuple[
     elif config_id == 2:
         # configuration 2: calculated vel, pos, joy
         config = partial(_generate_config_1_2, vel_mode=C.CALCULATED)
+    elif config_id == 3:
+        # configuration 3: original vel, pos, joy, destabilizing deflection
+        config = _generate_config_3
     else:
         raise ValueError("Cannot recognize config_num: {}".format(config_id))
 
@@ -50,11 +53,12 @@ def load_splits(loader: MARSDataLoader, config_id: int) -> Tuple[
             "Total sample size: {:>16}\n"
             "Train sample size: {:>16}\n"
             "Test sample size: {:>17}\n"
+            "Input shapes:\n"
             "X_train shape: {:>20}\n"
             "X_test shape: {:>21}\n"
             "y_train shape: {:>20}\n"
             "y_test shape: {:>21}\n".
-                format(loader.n,
+                format(loader.total_sample_size,
                        inds_train.shape[0],
                        inds_test.shape[0],
                        str(X_train.shape),
@@ -91,14 +95,8 @@ def _generate_config_1_2(loader: MARSDataLoader,
 
     # ### process x or y
     # pad X sequences
-    X_train = sequence.pad_sequences(X_train, maxlen=50, padding='post', dtype='float', truncating='post')
-    X_test = sequence.pad_sequences(X_test, maxlen=50, padding='post', dtype='float', truncating='post')
-
-    # one-hot encode y sequences
-    enc = OneHotEncoder(handle_unknown='ignore', sparse=False)
-    enc = enc.fit(y_train)
-    y_train = enc.transform(y_train)
-    y_test = enc.transform(y_test)
+    # X_train = sequence.pad_sequences(X_train, maxlen=50, padding='post', dtype='float', truncating='post')
+    # X_test = sequence.pad_sequences(X_test, maxlen=50, padding='post', dtype='float', truncating='post')
 
     # return processed x and y
     return inds_train, inds_test, X_train, X_test, y_train, y_test
@@ -114,20 +112,25 @@ def _generate_config_3(loader: MARSDataLoader) -> Tuple[
     """
 
     # load data
-    X_all = broadcast_to_sampled(loader.retrieve_col("destabilizing"), loader.basic_triples())
+    # X_all = broadcast_to_sampled(loader.retrieve_col("destabilizing"), loader.basic_triples())
+    X_all = np.dstack([loader.basic_triples(), loader.retrieve_col("destabilizing")])
     y_all = loader.retrieve_col("label").reshape(-1, 1)
 
-    # mark feature columns used
+    # record indices for later extracting splitting X and loading all feature entries for false positive analysis
+    inds_all = np.arange(y_all.shape[0])
 
-    # train test split
+    # ### train test split
+    inds_train, inds_test, y_train, y_test = train_test_split(inds_all, y_all,
+                                                              test_size=C.TEST_SIZE,
+                                                              random_state=C.RANDOM_SEED)
+    # retrieve cols from inds
+    X_train = X_all[inds_train]
+    X_test = X_all[inds_test]
 
-    # vectorize x or y
-
-    # return vectorized x and y
-
-    pass
+    return inds_train, inds_test, X_train, X_test, y_train, y_test
 
 
 
 if __name__ == "__main__":
-    pass
+    loader = MARSDataLoader(window_size=2.0, time_ahead=1.0, verbose=True)
+    inds_train, inds_test, X_train, X_test, y_train, y_test = load_splits(loader, 3)
