@@ -10,7 +10,7 @@ Experiment ID is generated from the exp_ID_config.csv file; 1 if file not exist
 import math
 import os
 import pickle
-from collections import OrderedDict
+from datetime import date
 from typing import Union
 
 import pandas as pd
@@ -32,6 +32,7 @@ class Recorder():
         self.verbose = verbose
         self.train_args = train_args
         self.configID = self.train_args["configID"]
+        self.exp_date = date.today().strftime("%B %d, %Y")
 
         # get unique experiment ID
         self.exp_ID = int(_find_next_exp_ID())

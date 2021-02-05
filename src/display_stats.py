@@ -6,7 +6,7 @@
 
 import argparse
 
-from .recording.recorder import Recorder
+from recording.recorder import Recorder
 
 def print_history(trainer: Recorder):
     """retrieves and prints model history in console"""

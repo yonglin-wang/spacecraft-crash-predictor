@@ -5,18 +5,14 @@
 """main class for parsing commandline input, creating DataLoader and training a model"""
 
 import os
-import pickle
 import argparse
 import time
 from typing import Union
 
-import pandas as pd
 import numpy as np
 import keras
-from keras.preprocessing import sequence
+
 import tensorflow as tf
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 
 import consts as C
