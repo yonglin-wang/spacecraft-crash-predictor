@@ -37,8 +37,7 @@ tf.random.set_seed(C.RANDOM_SEED)  # tensorflow pseudo-random generator
 
 
 def print_training_info(args: argparse.Namespace):
-    """print training information"""
-    # print training info
+    """helper function to print training information"""
     print("Training information:")
     print(f"Now training model with {int(args.window * 1000)}ms scale, {int(args.ahead * 1000)}ms ahead.\n"
           f"Using calculated weight? {args.cal_vel}\n"
@@ -79,6 +78,7 @@ def eval_and_save(model, begin,
                   history: keras.callbacks.History = None,
                   verbose=True,
                   save_pred_df=False): # TODO add this to argparser
+    """function called after training to record experiment"""
     time_str = display_exec_time(begin, scr_name="model.py")
 
     if verbose:

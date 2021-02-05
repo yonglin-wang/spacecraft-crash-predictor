@@ -84,8 +84,9 @@ class Recorder():
         if model:
             # append number to avoid collision, if needed
             collision_n = 0
-            while os.path.exists(self.model_path):
-                collision_n += 1
+            if os.path.exists(self.model_path):
+                while os.path.exists(self.model_path + "_" + str(collision_n)):
+                    collision_n += 1
                 self.model_path = self.model_path + "_" + str(collision_n)
             if collision_n:
                 print("Model path has been revised to {} to avoid collision. \n"
@@ -113,7 +114,7 @@ class Recorder():
         # df.append({"a":3, "c":5}, ignore_index=True)
         config_df = pd.read_csv(C.EXP_ID_LOG)
         config_df = config_df.append(self.__compile_exp_dict(), ignore_index=True)
-        config_df.to_csv(C.EXP_ID_COL, index=False)
+        config_df.to_csv(C.EXP_ID_LOG, index=False)
 
         if self.verbose:
             print("Experiment {} recorded successfully!".format(self.exp_ID))

@@ -45,7 +45,7 @@ def build_keras_rnn(sampling_rate, feature_num,
     model_out.compile(
         loss='binary_crossentropy',
         optimizer='adam',
-        metrics=[tf.keras.metrics.BinaryAccuracy(name=C.ACC, threshold=0.5),
+        metrics=[tf.keras.metrics.BinaryAccuracy(name=C.ACC, threshold=threshold),
                  tf.keras.metrics.AUC(name=C.AUC),
                  tf.keras.metrics.Precision(name=C.PRECISION),
                  tf.keras.metrics.Recall(name=C.RECALL)]
