@@ -28,7 +28,8 @@ class MARSDataLoader():
                  sampling_rate=50,
                  time_gap=5,
                  rolling_step=0.7,
-                 verbose=True
+                 verbose=True,
+                 show_pbar=False
                  ):
 
         # ensure time_gap has the right size
@@ -75,7 +76,8 @@ class MARSDataLoader():
                                        self.sampling_rate,
                                        self.time_gap,
                                        self.rolling,
-                                       self.data_dir)
+                                       self.data_dir,
+                                       show_pbar=show_pbar)
 
             # generate and save additional features here: destabilizing, nomalized, etc...
             non_init_feats = set(C.COL_PATHS.keys()).difference(C.INIT_FEATURES)

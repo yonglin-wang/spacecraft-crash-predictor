@@ -161,7 +161,8 @@ def generate_feature_files(window_size: float,
                            sampling_rate: int,
                            time_gap: float,
                            time_step: float,
-                           out_dir: str) -> int:
+                           out_dir: str,
+                           show_pbar=False) -> int:
     """
     Extract basic features columns from raw data and saving them to disk
     :author: Yonglin Wang, Jie Tang
@@ -245,7 +246,7 @@ def generate_feature_files(window_size: float,
           "\nTotal number of trials: {}".format(len(crash_keys_all), raw_data.peopleTrialKey.nunique()))
 
     # #### iterate through trials to process extract features
-    with tqdm(total=raw_data.peopleTrialKey.nunique()) as pbar:
+    with tqdm(total=raw_data.peopleTrialKey.nunique(), disable=not show_pbar) as pbar:
         # extract crash events features from each trial
         for current_trial_key, trial_raw_data in raw_data.groupby("peopleTrialKey"):
             # only process keys that has crashes

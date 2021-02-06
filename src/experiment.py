@@ -44,14 +44,15 @@ def train(args: argparse.Namespace):
     begin = time.time()
 
     # ### prepare data and other args
-    loader = MARSDataLoader(args.window, args.ahead, args.rate, args.gap, args.rolling, verbose=not args.silent)
+    loader = MARSDataLoader(args.window, args.ahead, args.rate, args.gap, args.rolling,
+                            verbose=not args.silent, show_pbar=args.pbar)
     recorder = Recorder(loader, vars(args), verbose=not args.silent)
     train_inds, test_inds, X_train, X_test, y_train, y_test = load_splits(loader, args.configID)
 
     # calculate class weight:
     if args.crash_ratio >= 1:
         class_weight = {0: 1, 1: args.crash_ratio}
-    elif args.crash_ratio <= 0:
+    elif args.crash_ratio <= 0
         raise ValueError("Crash ratio must be positive!")
     else:
         class_weight = {0: 1 - args.crash_ratio, 1: args.crash_ratio}
