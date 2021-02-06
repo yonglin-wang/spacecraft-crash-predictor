@@ -114,7 +114,7 @@ class Recorder():
         # once all of the above done, append experiment info to results/exp_ID_config.csv
         # add recorder path and model path to dict for append
         # df.append({"a":3, "c":5}, ignore_index=True)
-        config_df = pd.read_csv(C.EXP_ID_LOG)
+        config_df = pd.read_csv(C.EXP_ID_LOG, dtype={C.EXP_ID_COL: int})
         config_df = config_df.append(self.__compile_exp_dict(), ignore_index=True)
         config_df.to_csv(C.EXP_ID_LOG, index=False)
 
