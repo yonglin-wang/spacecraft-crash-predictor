@@ -52,7 +52,7 @@ def train(args: argparse.Namespace):
     # calculate class weight:
     if args.crash_ratio >= 1:
         class_weight = {0: 1, 1: args.crash_ratio}
-    elif args.crash_ratio <= 0:
+    elif args.crash_ratio <= 0
         raise ValueError("Crash ratio must be positive!")
     else:
         class_weight = {0: 1 - args.crash_ratio, 1: args.crash_ratio}
