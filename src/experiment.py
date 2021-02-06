@@ -203,7 +203,7 @@ def main():
         '--threshold', type=float, default=0.5,
         help='decision boundary for binary labels')
     argparser.add_argument(
-        '--max_epoch', type=int, default=30,
+        '--max_epoch', type=int, default=50,
         help='highest number of epochs allowed in experiment')
 
     # Experiment annotation
