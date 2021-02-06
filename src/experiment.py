@@ -99,7 +99,7 @@ def train(args: argparse.Namespace):
         print("Now evaluating, metrics used: {}".format(model.metrics_names))
 
     # generate result stats
-    eval_res = model.evaluate(X_test, y_test, return_dict=True, verbose=int(not args.silent))
+    eval_res = model.evaluate(X_test, y_test, return_dict=True, verbose=int(args.pbar))
     y_pred = model.predict(X_test)
     y_pred[y_pred >= args.threshold] = 1
     y_pred[y_pred < args.threshold] = 0
