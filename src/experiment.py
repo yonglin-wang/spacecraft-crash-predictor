@@ -179,9 +179,6 @@ def main():
     argparser.add_argument(
         '--silent', action='store_true',
         help='whether to silence custom print statements for training information')
-    argparser.add_argument(
-        '--pbar', action='store_true',
-        help='whether to display progress bar during training. If not selected, outputs one line per epoch.')
 
     # Model specific flags
     argparser.add_argument(
@@ -214,6 +211,9 @@ def main():
     argparser.add_argument(
         '--save_output', action='store_true',
         help='whether to save model test input and output as .csv data')
+    argparser.add_argument(
+        '--pbar', action='store_true',
+        help='whether to display progress bar during training. If not selected, outputs one line per epoch.')
 
     args = argparser.parse_args()
 
