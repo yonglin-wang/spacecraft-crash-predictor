@@ -419,6 +419,6 @@ if __name__ == "__main__":
                            sampling_rate=args.rate,
                            time_gap=args.gap,
                            time_step=args.rolling,
-                           out_dir="data/default_test_{}window_{}ahead_{}rolling/".format(int(args.window * 1000),
-                                                                                          int(args.ahead * 1000),
-                                                                                          int(args.rolling * 1000)))
+                           out_dir="data/{}window_{}ahead_{}rolling/".format(int(args.window * 1000),
+                                                                             int(args.ahead * 1000),
+                                                                             int(args.rolling * 1000)))

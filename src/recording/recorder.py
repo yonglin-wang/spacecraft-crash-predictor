@@ -60,6 +60,9 @@ class Recorder():
         self.test_inds = None
         self.test_preds = None
 
+        if self.verbose:
+            print("Now recording experiment #{}".format(self.exp_ID))
+
     def record_experiment(self,
                           test_results: dict,
                           time_taken: str,
@@ -68,8 +71,6 @@ class Recorder():
                           test_inds: Union[list, np.ndarray] = None,
                           test_preds: Union[list, np.ndarray] = None):
         """record training process, train history currently optional"""
-        assert model != None, "Model object must be provided!"
-
         # link references
         if train_history:
             self.history = train_history.history
@@ -175,29 +176,6 @@ def _find_next_exp_ID() -> int:
         # if file not exist, create one based on template
         pd.read_csv(C.TEMPLATE_ID_LOG).to_csv(C.EXP_ID_LOG, index=False)
         return 1
-    # # Load only exp_ID column
-    #
-    # # if column empty, return 1
-    #
-    # # else, return largest in ID col + 1
-    # # extract patterns
-    # dirs = os.listdir(dir)
-    # exp_search = re.compile(C.EXPID_PATTERN)
-    # ex_ids = []
-    #
-    # for dir in dirs:
-    #     match = exp_search.match(dir)
-    #     # if match found, record the ID integer
-    #     if match:
-    #         ex_ids.append(int(match.group(1)))
-    #
-    # # if no match, return 1
-    # if not ex_ids:
-    #     return 1
-    #
-    # # if match found, return max of matches + 1
-    # else:
-    #     return max(ex_ids) + 1
 
 
 if __name__ == "__main__":
