@@ -121,6 +121,7 @@ def train(args: argparse.Namespace):
 
 def print_training_info(args: argparse.Namespace):
     """helper function to print training information"""
+    print("*=*" * 20)
     print("Training information:")
     print(f"Now training model with {int(args.window * 1000)}ms scale, {int(args.ahead * 1000)}ms ahead.\n"
           f"Early Stopping? {args.early_stop}\n"
@@ -128,6 +129,8 @@ def print_training_info(args: argparse.Namespace):
 
     if args.early_stop:
         print(f"Stopping early if no {args.conv_crit} improvement in {args.patience} epochs.\n")
+
+    print("Note to this experiment: {}".format(args.notes))
 
 
 def compute_test_results(y_pred, y_true, eval_res):
@@ -180,7 +183,7 @@ def main():
         '--patience', type=int, default=3,
         help='max number of epochs allowed with no improvement, if early stopping')
     argparser.add_argument(
-        '--conv_crit', type=str.lower, default=C.VAL_RECALL, choices=C.CONV_CRIT,
+        '--conv_crit', type=str.lower, default=C.VAL_AUC, choices=C.CONV_CRIT,
         help='type of convergence criteria, if early stopping')
     argparser.add_argument(
         '--silent', action='store_true',
