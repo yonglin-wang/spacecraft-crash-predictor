@@ -178,7 +178,7 @@ def main():
         '--patience', type=int, default=3,
         help='max number of epochs allowed with no improvement, if early stopping')
     argparser.add_argument(
-        '--conv_crit', type=str.lower, default='loss', choices=['loss'],
+        '--conv_crit', type=str.lower, default=C.VAL_AUC, choices=C.CONV_CRIT,
         help='type of convergence criteria, if early stopping')
     argparser.add_argument(
         '--silent', action='store_true',

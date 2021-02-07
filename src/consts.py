@@ -82,8 +82,10 @@ CONFIG_SPECS = {
 # Model Constants
 # -----
 
-# path to save model (to be joined with exp)
-
+# convergence criteria, must be consistent with what EarlyStopping supports
+VAL_LOSS = "val_loss"
+VAL_AUC = "val_auc"
+CONV_CRIT = [VAL_AUC, VAL_LOSS]
 
 # list of available RNN models, all lower-cased
 LSTM = "lstm"
