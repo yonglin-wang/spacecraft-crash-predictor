@@ -84,8 +84,9 @@ CONFIG_SPECS = {
 
 # convergence criteria, must be consistent with what EarlyStopping supports
 VAL_LOSS = "val_loss"
-VAL_AUC = "val_auc"
-CONV_CRIT = [VAL_AUC, VAL_LOSS]
+VAL_AUC = "val_auc"  # converge too fast, not recommended
+VAL_RECALL = "val_recall"
+CONV_CRIT = [VAL_AUC, VAL_LOSS, VAL_RECALL]
 
 # list of available RNN models, all lower-cased
 LSTM = "lstm"
