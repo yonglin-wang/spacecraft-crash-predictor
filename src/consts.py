@@ -121,6 +121,7 @@ PRED_PATH = os.path.join(RESULT_DIR, "TestSetPred_exp{}_{}win_{}ahead_conf{}_{}.
 PRED_COL = "predicted"
 
 # experiment configuration .csv values
+ACCEPTABLE_TYPES = {int, str, bool, float}
 EXP_ID_LOG = os.path.join(RESULT_DIR, "exp_ID_config.csv")
 TEMPLATE_ID_LOG = os.path.join(RESULT_DIR, "template", "exp_ID_config.csv")
 EXP_ID_COL = "exp_ID"

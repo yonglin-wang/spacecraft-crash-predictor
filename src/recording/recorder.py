@@ -59,6 +59,7 @@ class Recorder():
         self.time_taken = None
         self.test_inds = None
         self.test_preds = None
+        self.total_epochs = None
 
         if self.verbose:
             print("Now recording experiment #{}".format(self.exp_ID))
@@ -74,6 +75,8 @@ class Recorder():
         # link references
         if train_history:
             self.history = train_history.history
+            self.total_epochs = len(train_history.epoch)
+
         self.time_taken = time_taken
         self.test_inds = test_inds
         self.test_preds = test_preds
@@ -156,8 +159,19 @@ class Recorder():
         """compile experiment configuration dictionary"""
         # put together attributes for extraction
         all_atts = {**vars(self), **vars(self.loader), **self.train_args}
-        # loop over ordered columns
-        return {C.EXP_COL_CONV[column]: all_atts[column] for column in C.EXP_COL_CONV}
+
+        # keep only savable atts--filter out lists, dicts, etc.
+        savable_atts = _filter_values(all_atts)
+
+        # convert the convertable columns, if possible, for output
+        output = {}
+        for (column, value) in savable_atts.items():
+            if column in C.EXP_COL_CONV:
+                output[C.EXP_COL_CONV[column]] = value
+            else:
+                output[column] = value
+
+        return output
 
 
 def _find_next_exp_ID() -> int:
@@ -176,6 +190,11 @@ def _find_next_exp_ID() -> int:
         # if file not exist, create one based on template
         pd.read_csv(C.TEMPLATE_ID_LOG).to_csv(C.EXP_ID_LOG, index=False)
         return 1
+
+
+def _filter_values(vars_dict: dict)->dict:
+    """helper function to filter out dictionary entries whose values are not str, num or bool"""
+    return {key: value for key, value in vars_dict.items() if type(value) in C.ACCEPTABLE_TYPES}
 
 
 if __name__ == "__main__":

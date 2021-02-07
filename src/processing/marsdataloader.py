@@ -229,7 +229,7 @@ def generate_all_feat_df(loader:MARSDataLoader, config_id: int, inds: Union[list
     # change name of columns to label which ones are used
     used_col = C.CONFIG_SPECS[config_id][C.COLS_USED]
     if used_col:
-        __rename_used_cols(output, used_col)
+        output = __rename_used_cols(output, used_col)
 
     return output
 

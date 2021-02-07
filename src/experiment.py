@@ -105,6 +105,10 @@ def train(args: argparse.Namespace):
     y_pred[y_pred < args.threshold] = 0
     results = compute_test_results(y_pred, y_test, eval_res)
 
+    # print test set results:
+    if not args.silent:
+        print("Evaluation done, results: {}".format(eval_res))
+
     # record experiment
     recorder.record_experiment(results, time_str, model, train_history=history, test_inds=test_inds, test_preds=y_pred)
 
