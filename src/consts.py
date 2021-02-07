@@ -87,6 +87,9 @@ VAL_LOSS = "val_loss"
 VAL_AUC = "val_auc"  # converge too fast, not recommended
 VAL_RECALL = "val_recall"
 CONV_CRIT = [VAL_AUC, VAL_LOSS, VAL_RECALL]
+CONV_MODE = {VAL_LOSS: "min",
+             VAL_AUC: "max",
+             VAL_RECALL: "max"}
 
 # list of available RNN models, all lower-cased
 LSTM = "lstm"

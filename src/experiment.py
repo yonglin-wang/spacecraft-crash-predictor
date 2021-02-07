@@ -65,7 +65,9 @@ def train(args: argparse.Namespace):
 
     # early stopping to save up GPU, stops training when there's no loss reduction in given epochs
     if args.early_stop:
-        callback = [tf.keras.callbacks.EarlyStopping(monitor=args.conv_crit, patience=args.patience)]
+        callback = [tf.keras.callbacks.EarlyStopping(monitor=args.conv_crit,
+                                                     patience=args.patience,
+                                                     mode=C.CONV_MODE[args.conv_crit])]
     else:
         callback = None
 
