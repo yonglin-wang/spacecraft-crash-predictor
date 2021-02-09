@@ -10,10 +10,9 @@ import time
 from typing import Union
 
 import numpy as np
-import keras
 
 import tensorflow as tf
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, roc_auc_score
 
 import consts as C
 from utils import display_exec_time
@@ -102,21 +101,112 @@ def train(args: argparse.Namespace):
 
     # generate result stats
     eval_res = model.evaluate(X_test, y_test, return_dict=True, verbose=int(args.pbar))
-    y_pred = model.predict(X_test)
+    y_pred_proba = model.predict(X_test)
+    y_pred = y_pred_proba.copy()
     y_pred[y_pred >= args.threshold] = 1
     y_pred[y_pred < args.threshold] = 0
-    results = compute_test_results(y_pred, y_test, eval_res)
+    results = compute_test_results(y_pred, y_test, y_pred_proba, eval_res)
 
     # print test set results:
     if not args.silent:
         print("Evaluation done, results: {}".format(eval_res))
 
     # record experiment
-    recorder.record_experiment(results, time_str, model, train_history=history, test_inds=test_inds, test_preds=y_pred)
+    recorder.record_experiment(results, time_str, model, train_history=history)
 
-    # output experiment if needed, same as recorder.save_predictions(test_inds=test_inds, y_pred=y_pred)
+    # output predictions and input to csv if needed
     if args.save_output:
-        recorder.save_predictions()
+        recorder.save_predictions(test_inds, y_pred)
+
+
+def train_CV(args: argparse.Namespace):
+    # ### Begin script
+    # confirm TensorFlow sees the GPU
+    # assert 'GPU' in str(device_lib.list_local_devices()), "TensorFlow cannot find GPU"
+    #
+    # # confirm Keras sees the GPU (for TensorFlow 1.X + Keras)
+    # assert len(tensorflow_backend._get_available_gpus()) > 0, "Keras cannot find GPU"
+
+    # ### time the script
+    begin = time.time()
+
+    # ### prepare data and other args
+    loader = MARSDataLoader(args.window, args.ahead, args.rate, args.gap, args.rolling,
+                            verbose=not args.silent, show_pbar=args.pbar)
+    recorder = Recorder(loader, vars(args), verbose=not args.silent)
+    train_inds, test_inds, X_train, X_test, y_train, y_test = load_splits(loader, args.configID)
+
+    # calculate class weight:
+    if args.crash_ratio >= 1:
+        class_weight = {0: 1, 1: args.crash_ratio}
+    elif args.crash_ratio <= 0:
+        raise ValueError("Crash ratio must be positive!")
+    else:
+        class_weight = {0: 1 - args.crash_ratio, 1: args.crash_ratio}
+
+    # prepare args
+    if args.pbar:
+        fit_ver = 1
+    else:
+        fit_ver = 2  # only one line per epoch in output file
+
+    # TODO k-fold CV split, StratifiedKFold
+
+    # early stopping to save up GPU, stops training when there's no loss reduction in given epochs
+    if args.early_stop:
+        callback = [tf.keras.callbacks.EarlyStopping(monitor=args.conv_crit,
+                                                     patience=args.patience,
+                                                     mode=C.CONV_MODE[args.conv_crit])]
+    else:
+        callback = None
+
+    # ### start training
+    # build model
+    if args.model in C.RNN_MODELS:
+        model = build_keras_rnn(X_train.shape[1],
+                                X_train.shape[2],
+                                rnn_out_dim=args.hidden_dim,
+                                dropout_rate=args.dropout,
+                                rnn_type=args.model)
+    else:
+        raise NotImplementedError("Model {} has not been implemented!".format(args.model))
+
+    # train model
+    history = model.fit(
+        X_train, y_train,
+        epochs=args.max_epoch,
+        batch_size=args.batch_size,
+        validation_split=0.1,
+        verbose=fit_ver,
+        shuffle=False,
+        class_weight=class_weight,
+        callbacks=callback
+    )
+
+    time_str = display_exec_time(begin, scr_name="model.py")
+
+    # ### Evaluate model
+    if not args.silent:
+        print("Now evaluating, metrics used: {}".format(model.metrics_names))
+
+    # generate result stats
+    eval_res = model.evaluate(X_test, y_test, return_dict=True, verbose=int(args.pbar))
+    y_pred_proba = model.predict(X_test)
+    y_pred = y_pred_proba.copy()
+    y_pred[y_pred >= args.threshold] = 1
+    y_pred[y_pred < args.threshold] = 0
+    results = compute_test_results(y_pred, y_test, y_pred_proba, eval_res)
+
+    # print test set results:
+    if not args.silent:
+        print("Evaluation done, results: {}".format(eval_res))
+
+    # record experiment
+    recorder.record_experiment(results, time_str, model, train_history=history)
+
+    # output predictions and input to csv if needed
+    if args.save_output:
+        recorder.save_predictions(test_inds, y_pred)
 
 
 def print_training_info(args: argparse.Namespace):
@@ -133,10 +223,12 @@ def print_training_info(args: argparse.Namespace):
     print("Note to this experiment: {}".format(args.notes))
 
 
-def compute_test_results(y_pred, y_true, eval_res):
+def compute_test_results(y_pred, y_true, y_proba, eval_res):
     """helper function to compute and return dictionary with following keys:
     accuracy,precision,recall,auc,f1,tn,fp,fn,tp
     """
+
+    # TODO change to metrics to list and average metrics for CV
 
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
     return {
@@ -148,7 +240,8 @@ def compute_test_results(y_pred, y_true, eval_res):
         "accuracy": eval_res[C.ACC],
         "precision": eval_res[C.PRECISION],
         "recall": eval_res[C.RECALL],
-        "auc": eval_res[C.AUC],
+        "auc_tf": eval_res[C.AUC],
+        "auc_sklearn": roc_auc_score(y_true, y_proba),
         "f1": (2 * eval_res[C.PRECISION] * eval_res[C.RECALL])/(eval_res[C.PRECISION] + eval_res[C.RECALL])
     }
 
@@ -212,6 +305,12 @@ def main():
     argparser.add_argument(
         '--max_epoch', type=int, default=50,
         help='highest number of epochs allowed in experiment')
+    argparser.add_argument(
+        '--cv', action='store_true',
+        help='whether to run k-fold cross-validation on dataset; 1 split if not selected')
+    argparser.add_argument(
+        '--k_fold', type=int, default=10,
+        help='number of k folds, if cross-validation selected')
 
     # Experiment annotation
     argparser.add_argument(
@@ -231,7 +330,12 @@ def main():
     else:
         print_training_info(args)
 
-    train(args)
+    if args.cv:
+        # if k-fold CV, run a different function
+        train_CV(args)
+    else:
+        # if not k-fold, run 1 split training
+        train(args)
 
 
 if __name__=="__main__":

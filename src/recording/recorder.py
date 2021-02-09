@@ -15,6 +15,7 @@ from typing import Union
 
 import pandas as pd
 from tensorflow.keras import Sequential
+from tensorflow.keras.models import load_model
 from tensorflow.keras.callbacks import History
 import numpy as np
 
@@ -57,8 +58,6 @@ class Recorder():
         self.recorder_path = os.path.join(self.exp_dir, C.REC_PATH)
         self.history = None  # hisotry dict from keras history object, if any passed
         self.time_taken = None
-        self.test_inds = None
-        self.test_preds = None
         self.total_epochs = None
 
         if self.verbose:
@@ -68,9 +67,7 @@ class Recorder():
                           test_results: dict,
                           time_taken: str,
                           model: Sequential = None,
-                          train_history: History = None,
-                          test_inds: Union[list, np.ndarray] = None,
-                          test_preds: Union[list, np.ndarray] = None):
+                          train_history: History = None):
         """record training process, train history currently optional"""
         # link references
         if train_history:
@@ -78,8 +75,6 @@ class Recorder():
             self.total_epochs = len(train_history.epoch)
 
         self.time_taken = time_taken
-        self.test_inds = test_inds
-        self.test_preds = test_preds
 
         # create new path in results and experiment folders
         if not os.path.exists(self.exp_dir):
@@ -129,19 +124,8 @@ class Recorder():
         # TODO
 
     def save_predictions(self,
-                         test_inds: Union[list, np.ndarray] = None,
-                         y_pred: Union[list, np.ndarray] = None):
-        """output model predictions on test set as CSV file"""
-        if not test_inds:
-            assert self.test_inds is not None, "Provide test indices or run record_experiment " \
-                                               "before calling this fucntion"
-            test_inds = self.test_inds
-
-        if not y_pred:
-            assert self.test_preds is not None, "Provide test predictions or run record_experiment " \
-                                                "before calling this function"
-            y_pred = self.test_preds
-
+                         test_inds: Union[list, np.ndarray],
+                         y_pred: Union[list, np.ndarray]):
         # generate test DataFrame
         test_df = generate_all_feat_df(self.loader, self.configID, inds=test_inds)
         test_df[C.PRED_COL] = y_pred
@@ -172,6 +156,19 @@ class Recorder():
                 output[column] = value
 
         return output
+
+    def predict_with_model(self, X_input: np.ndarray) -> np.ndarray:
+        """return y probabilities given data with model saved at model_path"""
+        assert os.path.exists(self.model_path), "No model saved at {}".format(self.model_path)
+
+        model = load_model(self.model_path)
+
+        # compare only non sample size shapes
+        assert model.input_shape[1:] == X_input.shape[1:], \
+            "2nd & 3rd dimensions of input ({}) do not align with model input shape ({}).".format(str(model.input_shape[1:]),
+                                                                                     str(X_input.shape[1:]))
+
+        return model.predict(X_input)
 
 
 def _find_next_exp_ID() -> int:
