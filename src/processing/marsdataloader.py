@@ -89,9 +89,9 @@ class MARSDataLoader():
 
         # record sample size, assuming all columns have equal lengths (as they should)
         labels = self.retrieve_col("label")
-        self.total_sample_size = labels.shape[0]
-        self.crash_sample_size = np.sum(labels==1)
-        self.noncrash_sample_size = np.sum(labels==0)
+        self.total_sample_size = int(labels.shape[0])
+        self.crash_sample_size = int(np.sum(labels==1))
+        self.noncrash_sample_size = int(np.sum(labels==0))
 
     def __save_new_feature(self, generated_col: np.ndarray, col_name: str):
         """internal helper for validating and creating new feature and checking spelling"""
