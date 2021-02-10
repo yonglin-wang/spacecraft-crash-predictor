@@ -2,7 +2,7 @@
 
 This work is a part of a project accepted by TRISH's GoForLaunch program, with a greater aim to enhance human performance in space flights and postural balancing tasks. For details, see [Dr. Vimal's project description and research roadmap](https://sites.google.com/view/vivekanandpandeyvimal/research_2/current-research?authuser=0#h.on5o56f1ne5m). 
 
-This project aims to build a classifier that predicts spacecraft crashes in advance. Special thanks to Jie Tang, some of whose [code logic for the same task](https://github.com/TJmask/Space-Health-Predicting) has been especially helpful in building this project; Jie's name will be included the docstring sections of the functions, wherever credit is due. 
+This project aims to build a classifier that predicts spacecraft crashes in advance. Special thanks to [Jie Tang](https://github.com/TJmask), some of whose [code logic for the same task](https://github.com/TJmask/Space-Health-Predicting) has been especially helpful in building this project; Jie's name will be included the docstring sections of the functions, wherever credit is due. 
 
 # Requirements
 
@@ -43,18 +43,18 @@ These are the exact steps I used to install the exact versions listed above:
 
 ```./src/experiment.py``` runs an experiment pipeline, which puts together preprocessing, modeling, evaluation, and logging. 
 
-Under project root, run ```$ python ./src/experiment.py -h``` to see all available arguments. 
+Under project root, run ```$ ./src/experiment.py -h``` to see all available arguments. 
 
 - Example 1: running the all default options
 
   ```
-  $ python ./src/experiment.py
+  $ ./src/experiment.py
   ```
 
 - Example 2: template for tweaking most of the parameters
 
   ```
-  $ python ./src/experiment.py --window 2.0 --ahead 1.0 --rolling 0.7 --configID 1 --early_stop \
+  $ ./src/experiment.py --window 2.0 --ahead 1.0 --rolling 0.7 --configID 1 --early_stop \
   						   --model gru --crash_ratio 1 --dropout 0.5 --hidden_dim 100 \
   						   --batch_size 256 --notes "initial test run, diff in window, gru"
   ```
@@ -62,7 +62,7 @@ Under project root, run ```$ python ./src/experiment.py -h``` to see all availab
 - Example 3: if working on an interactive shell, add ```--pbar``` to show progress bar
 
   ```
-  $ python ./src/experiment.py --pbar <other arguments>
+  $ ./src/experiment.py --pbar <other arguments>
   ```
 
 # Examine Results
