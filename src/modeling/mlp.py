@@ -1,5 +1,3 @@
-# !/usr/bin/env python3
-# -*- coding: utf-8 -*-
 # Author: Yonglin Wang
 # Date: 2021/1/30 11:01 PM
 
