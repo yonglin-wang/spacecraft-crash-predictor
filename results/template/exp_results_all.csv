@@ -1,1 +1,1 @@
-exp_ID,accuracy,precision,recall,auc_tf,auc_sklearn,f1,tn,fp,fn,tp,total
+exp_ID,auc_tf,auc_sklearn,precision,recall,accuracy,f1,tn,fp,fn,tp,total
