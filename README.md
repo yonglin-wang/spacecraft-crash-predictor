@@ -10,9 +10,9 @@ This project aims to build a classifier that predicts spacecraft crashes in adva
 
 Among other required packages, we crucially need to make sure the following versions are correct:
 
-- tensorflow 2.2.0
+- tensorflow 2.2.0 (```$ pip install tensorflow==2.2.0```)
 - keras 2.4.3 (```$ pip install keras==2.4.3```)
-- numpy 1.19.2
+- numpy 1.19.2 (```$ pip install numpy==1.19.2```)
 
 ## Notes to installing on HPCC
 
@@ -120,7 +120,7 @@ Whenever a new model build has been proposed:
 
   2. Add the new model's name to [consts.py](src/consts.py), with all caps variable name and lowercased string name, i.e. ```MODEL_NAME="name"```, and insert it into list ```AVAILABLE_MODELS``` and another model subgroup (e.g. ```RNN_MODELS```) as you see fit.
 
-  3. Insert the following script into [experiment.py](src/experiment.py) where a build function is called:
+  3. Insert the following script into ```match_and_build_model``` function in [experiment.py](src/experiment.py):
 
      ```
      elif args.model in C.<MODEL_SUBGROUP>:
