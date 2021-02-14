@@ -17,7 +17,7 @@ from tqdm import tqdm
 import argparse
 import random
 
-from utils import display_exec_time
+from utils import calculate_exec_time
 import consts as C
 
 # control for randomness in case of any
@@ -147,11 +147,11 @@ def extract_destabilize(feature_matrix: np.ndarray) -> np.ndarray:
         signs = feature_matrix / np.abs(feature_matrix)
 
     # get booleans of whether all columns have same sign value as 1st (i.e. all same sign)
-    # same_sign shape: (sampling_rate, 3)
-    same_sign = np.equal(signs, signs[:, 0:1])
+    # same_sign shape: (sample_size, sampling_rate, 3)
+    same_sign = np.equal(signs, signs[:, :, 0:1])
 
     # sum up booleans, only destabilizing when all 3 columns in a row are true (i.e. row sums to 3)
-    # return shape: (sampling_rate,)
+    # return shape: (sample_size, sampling_rate)
     num_feats = feature_matrix.shape[2]
     return np.equal(same_sign.sum(axis=2), num_feats)
 
@@ -174,6 +174,10 @@ def generate_feature_files(window_size: float,
     :param out_dir: output directory to save all features to
     :return: total number of samples generated
     """
+    # ensure raw data file exists
+    if not os.path.exists(C.RAW_DATA_PATH):
+        raise FileNotFoundError("Raw data file cannot be found at {}".format(C.RAW_DATA_PATH))
+
     # record time used for preprocessing
     begin = time.time()
 
@@ -206,6 +210,7 @@ def generate_feature_files(window_size: float,
     joystick_list = []
     label_list = []
     trial_key_list = []
+    person_list = []
     start_list = []
     end_list = []
 
@@ -219,14 +224,13 @@ def generate_feature_files(window_size: float,
         joystick_list.append(int_results["joystickX"])
         label_list.append(label)
         trial_key_list.append(trial_key)
+        person_list.append(entries_for_inter["peopleName"].iloc[0])
         start_list.append(entries_for_inter['seconds'].iloc[0])
         end_list.append(entries_for_inter['seconds'].iloc[-1])
 
     # #### load raw data
     # extract all needed columns
-    raw_data = pd.read_csv('data/data_all.csv',
-                           usecols=['seconds', 'trialPhase', 'currentPosRoll', 'currentVelRoll', 'calculated_vel',
-                                    'joystickX', 'peopleTrialKey'])
+    raw_data = pd.read_csv(C.RAW_DATA_PATH, usecols=C.ESSENTIAL_RAW_COLS)
 
     # filter out non-human controls in data
     raw_data = raw_data[raw_data.trialPhase != 1]
@@ -326,10 +330,14 @@ def generate_feature_files(window_size: float,
     expected_length = len(label_list)
     # save column as .npy files, if disk is a concern in future, specify dtype in save_col
     [save_col(value, col_name, out_dir, expect_len=expected_length)
-     for value, col_name in [(vel_ori_list, "velocity"), (vel_cal_list, "velocity_cal"),
-                             (position_list, "position"), (joystick_list, "joystick"),
-                             (label_list, "label"), (trial_key_list, "trial_key"),
-                             (trial_key_list, "trial_key"), (start_list, "start_seconds"),
+     for value, col_name in [(vel_ori_list, "velocity"),
+                             (vel_cal_list, "velocity_cal"),
+                             (position_list, "position"),
+                             (joystick_list, "joystick"),
+                             (label_list, "label"),
+                             (person_list, "person"),
+                             (trial_key_list, "trial_key"),
+                             (start_list, "start_seconds"),
                              (end_list, "end_seconds")]]
 
     print("Done!\n")
@@ -360,7 +368,7 @@ def generate_feature_files(window_size: float,
           "Total sample size: {}".format(crash_total, noncrash_total, expected_length))
 
     print("Feature generation done!")
-    display_exec_time(begin, scr_name=__file__)
+    calculate_exec_time(begin, scr_name=__file__)
 
     return expected_length
 
@@ -382,44 +390,95 @@ def broadcast_to_sampled(arr: np.ndarray, arr_sampled: np.ndarray) -> np.ndarray
 
 
 if __name__ == "__main__":
-    # noinspection PyTypeChecker
-    argparser = argparse.ArgumentParser(prog="Data Pre-processing Argparser",
-                                        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-
-    argparser.add_argument(
-        '--window', type=float, default=1.0,
-        help='size of sliding window to generate non-crash training data, in seconds')
-    argparser.add_argument(
-        '--ahead', type=float, default=0.5, help='prediction timing ahead of event, in seconds')
-    argparser.add_argument(
-        '--rate', type=int, default=50, help='number of samples obtained per time scale extracted')
-    argparser.add_argument(
-        '--gap', type=int, default=5, help='minimal time gap allowed between two crash events for data extraction')
-    argparser.add_argument(
-        '--rolling', type=float, default=0.5, help='length of rolling time step of sliding window, in seconds')
-
-    args = argparser.parse_args()
-
-    print("Generating features...")
-    print(f"current working directory: {os.getcwd()}")
-
-    # check for minimal rolling step
-    if args.rolling < C.MIN_STEP:
-        raise argparse.ArgumentTypeError("Rolling step must be smaller than {}".format(C.MIN_STEP))
-
-    # Ensure gap large enough to accommodate data extraction.
-    # Time gap is used to exclude those consecutive crash events happened within less than this length.
-    # When two crash events happened too closely, we could not generate enough data to for interpolation.
-    # In principle: time gap >= non crashing time scale + crushing time scale + time ahead of predicted event
-    if args.gap < (2 * args.window + args.ahead):
-        args.gap = (2 * args.window + args.ahead)
-
-    # generate feature files, for debug only
-    generate_feature_files(window_size=args.window,
-                           time_ahead=args.ahead,
-                           sampling_rate=args.rate,
-                           time_gap=args.gap,
-                           time_step=args.rolling,
-                           out_dir="data/{}window_{}ahead_{}rolling/".format(int(args.window * 1000),
-                                                                             int(args.ahead * 1000),
-                                                                             int(args.rolling * 1000)))
+    # # noinspection PyTypeChecker
+    # argparser = argparse.ArgumentParser(prog="Data Pre-processing Argparser",
+    #                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    #
+    # argparser.add_argument(
+    #     '--window', type=float, default=1.0,
+    #     help='size of sliding window to generate non-crash training data, in seconds')
+    # argparser.add_argument(
+    #     '--ahead', type=float, default=0.5, help='prediction timing ahead of event, in seconds')
+    # argparser.add_argument(
+    #     '--rate', type=int, default=50, help='number of samples obtained per time scale extracted')
+    # argparser.add_argument(
+    #     '--gap', type=int, default=5, help='minimal time gap allowed between two crash events for data extraction')
+    # argparser.add_argument(
+    #     '--rolling', type=float, default=0.5, help='length of rolling time step of sliding window, in seconds')
+    #
+    # args = argparser.parse_args()
+    #
+    # print("Generating features...")
+    # print(f"current working directory: {os.getcwd()}")
+    #
+    # # check for minimal rolling step
+    # if args.rolling < C.MIN_STEP:
+    #     raise argparse.ArgumentTypeError("Rolling step must be smaller than {}".format(C.MIN_STEP))
+    #
+    # # Ensure gap large enough to accommodate data extraction.
+    # # Time gap is used to exclude those consecutive crash events happened within less than this length.
+    # # When two crash events happened too closely, we could not generate enough data to for interpolation.
+    # # In principle: time gap >= non crashing time scale + crushing time scale + time ahead of predicted event
+    # if args.gap < (2 * args.window + args.ahead):
+    #     args.gap = (2 * args.window + args.ahead)
+    #
+    # # generate feature files, for debug only
+    # generate_feature_files(window_size=args.window,
+    #                        time_ahead=args.ahead,
+    #                        sampling_rate=args.rate,
+    #                        time_gap=args.gap,
+    #                        time_step=args.rolling,
+    #                        out_dir="data/{}window_{}ahead_{}rolling/".format(int(args.window * 1000),
+    #                                                                          int(args.ahead * 1000),
+    #                                                                          int(args.rolling * 1000)))
+    # test array for destabilizing
+    test = np.array([[[-1.33037200e+00, -7.41577148e-02,  7.93500000e-03],
+        [-1.53890487e+00, -1.05763027e-01,  7.93500000e-03],
+        [-1.75210133e+00, -1.38412787e-01,  7.93500000e-03],
+        [-1.96884604e+00, -1.82675731e-01,  7.93500000e-03],
+        [-2.17791685e+00, -2.30360559e-01,  7.93500000e-03],
+        [-2.38748831e+00, -2.85588479e-01,  7.93500000e-03],
+        [-2.59555824e+00, -3.50537536e-01,  7.93500000e-03],
+        [-2.85546893e+00, -4.25701531e-01,  7.93500000e-03],
+        [-3.10720480e+00, -5.05993012e-01,  7.93500000e-03],
+        [-3.45086013e+00, -5.94903262e-01,  7.93500000e-03],
+        [-3.84003738e+00, -6.91673435e-01,  7.93500000e-03],
+        [-4.21499298e+00, -7.97910106e-01,  7.93500000e-03],
+        [-4.61448268e+00, -9.21511903e-01,  7.93500000e-03],
+        [-4.99918721e+00, -1.04969881e+00,  7.93500000e-03],
+        [-5.38892737e+00, -1.20009940e+00,  7.93500000e-03],
+        [-5.80406624e+00, -1.35905363e+00,  7.93500000e-03],
+        [-6.37163817e+00, -1.53420301e+00,  7.93500000e-03],
+        [-6.90604815e+00, -1.72265472e+00,  7.93500000e-03],
+        [-7.43318639e+00, -1.92922459e+00,  7.93500000e-03],
+        [-8.05186151e+00, -2.14963867e+00,  7.93500000e-03],
+        [-8.83773537e+00, -2.40490723e+00,  7.93500000e-03],
+        [-9.68833315e+00, -2.65525351e+00,  7.93500000e-03],
+        [-1.05166933e+01, -2.94108221e+00,  7.48002915e-04],
+        [-1.12435613e+01, -3.27175153e+00, -6.85735983e-03],
+        [-1.18071835e+01, -3.60280223e+00, -4.00936160e-02],
+        [-1.18844318e+01, -3.98929977e+00, -9.19684329e-02],
+        [-1.09752067e+01, -4.37095709e+00, -1.08434121e-01],
+        [-1.00343260e+01, -4.76559729e+00, -1.50015056e-01],
+        [-8.25870083e+00, -5.18913425e+00, -1.81259741e-01],
+        [-5.82821429e+00, -5.57657848e+00, -2.12950096e-01],
+        [-3.02508630e+00, -5.94028520e+00, -2.34406000e-01],
+        [ 8.37243411e-02, -6.24473194e+00, -2.58473663e-01],
+        [ 3.50552065e+00, -6.50082335e+00, -2.96487922e-01],
+        [ 7.90553646e+00, -6.68705443e+00, -3.15332388e-01],
+        [ 1.24051454e+01, -6.78966289e+00, -3.18065449e-01],
+        [ 1.71298077e+01, -6.77479771e+00, -3.15153600e-01],
+        [ 2.21311122e+01, -6.62702157e+00, -3.20343000e-01],
+        [ 2.71184397e+01, -6.34269870e+00, -3.20343000e-01],
+        [ 3.18865434e+01, -5.89778191e+00, -3.20343000e-01],
+        [ 3.72575396e+01, -5.27949119e+00, -2.95949367e-01],
+        [ 4.22480774e+01, -4.49850099e+00, -1.85640012e-01],
+        [ 4.49405268e+01, -3.56736724e+00, -2.11803602e-02],
+        [ 4.47322754e+01, -2.43060119e+00, -1.00225564e-05],
+        [ 4.43370833e+01, -1.17706655e+00, -2.13294461e-05],
+        [ 4.42210265e+01,  2.01836903e-01, -3.10000000e-05],
+        [ 4.43938601e+01,  1.62909683e+00, -3.10000000e-05],
+        [ 4.48791384e+01,  3.12088057e+00,  1.30159728e-02],
+        [ 4.54764091e+01,  4.66572540e+00,  2.29376276e-02],
+        [ 4.61842655e+01,  6.27996393e+00,  2.40511386e-02],
+        [ 4.71048340e+01,  7.93487549e+00,  2.38040000e-02]]])

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Author: Yonglin Wang
 # Date: 2021/1/30 10:38 PM
 """functions to return a built RNN model. Classes will be used if complicated deep learning architecture is involved."""

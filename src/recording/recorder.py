@@ -11,7 +11,7 @@ import math
 import os
 import pickle
 from datetime import date
-from typing import Union
+from typing import Union, Dict
 
 import pandas as pd
 from tensorflow.keras import Sequential
@@ -53,9 +53,11 @@ class Recorder():
                                             self.train_args["configID"],
                                             self.train_args["model"])
 
-        # to be recorded on record_experiment
+
         self.model_path = os.path.join(self.exp_dir, C.MODEL_PATH)  # path to model
         self.recorder_path = os.path.join(self.exp_dir, C.REC_PATH)
+
+        # to be recorded on record_experiment
         self.history = None  # hisotry dict from keras history object, if any passed
         self.time_taken = None
         self.total_epochs = None
@@ -66,66 +68,36 @@ class Recorder():
     def record_experiment(self,
                           test_results: dict,
                           time_taken: str,
+                          epoch_list: list,
                           model: Sequential = None,
-                          train_history: History = None):
-        """record training process, train history currently optional"""
+                          train_history: list = None):
+        """record experiment configuration and statistics"""
         # link references
         if train_history:
-            self.history = train_history.history
-            self.total_epochs = len(train_history.epoch)
-
+            self.history = train_history
+        self.average_epochs = float(np.mean(epoch_list))
+        self.std_epochs = float(np.std(epoch_list))
         self.time_taken = time_taken
 
         # create new path in results and experiment folders
         if not os.path.exists(self.exp_dir):
             os.mkdir(self.exp_dir)
 
-        # save model, if any, current syntax only supports Keras model
         if model:
-            # append number to avoid collision, if needed
-            collision_n = 0
-            if os.path.exists(self.model_path):
-                while os.path.exists(self.model_path + "_" + str(collision_n)):
-                    collision_n += 1
-                self.model_path = self.model_path + "_" + str(collision_n)
-            if collision_n:
-                print("Model path has been revised to {} to avoid collision. \n"
-                      "In principal, this shouldn't happen since model path has unique experiment ID.".format(
-                    self.model_path))
-            model.save(self.model_path)
+            self.__save_model(model)
 
-        # ### append test_dict (test set results) values to results/exp_results_all.csv
-        # add to current results
-        test_results[C.EXP_ID_COL] = self.exp_ID
-        # retrieve results
-        try:
-            results_df = pd.read_csv(C.ALL_RES_CSV_PATH)
-        except IOError:
-            results_df = pd.read_csv(C.TEMPLATE_ALL_RES)
-        # append results and save
-        results_df = results_df.append(test_results, ignore_index=True)
-        results_df.to_csv(C.ALL_RES_CSV_PATH, index=False)
-
-        # ### pickle this object to its path
-        pickle.dump(self, open(self.recorder_path, "wb"))
+        # append test set metrics to results/exp_results_all.csv
+        self.__save_results(test_results)
 
         # once all of the above done, append experiment info to results/exp_ID_config.csv
-        # add recorder path and model path to dict for append
-        # df.append({"a":3, "c":5}, ignore_index=True)
-        config_df = pd.read_csv(C.EXP_ID_LOG, dtype={C.EXP_ID_COL: int})
-        config_df = config_df.append(self.__compile_exp_dict(), ignore_index=True)
-        config_df.to_csv(C.EXP_ID_LOG, index=False)
+        self.__save_exp_config()
 
         if self.verbose:
             print("Experiment {} recorded successfully!".format(self.exp_ID))
 
-    def plot_history(self, save=True):
-        """generate plot for history, can save at experiment path"""
-        # TODO
-
     def save_predictions(self,
                          test_inds: Union[list, np.ndarray],
-                         y_pred: Union[list, np.ndarray]):
+                         y_pred: Union[list, np.ndarray]) -> None:
         # generate test DataFrame
         test_df = generate_all_feat_df(self.loader, self.configID, inds=test_inds)
         test_df[C.PRED_COL] = y_pred
@@ -137,7 +109,50 @@ class Recorder():
         test_df.to_csv(self.pred_path, index=False)
 
         if self.verbose:
-            print("Model test set input and prediction saved succesfully!")
+            print("Model test set input and prediction saved successfully!")
+
+    def __save_model(self, model) -> None:
+        """helper to save models"""
+        assert type(model) == Sequential, "Only Keras Sequential models are supported! " \
+                                          "Consider adding new code and updating model saving methods."
+        # append number to avoid collision, if needed
+        collision_n = 0
+        if os.path.exists(self.model_path):
+            while os.path.exists(self.model_path + "_" + str(collision_n)):
+                collision_n += 1
+            self.model_path = self.model_path + "_" + str(collision_n)
+        if collision_n:
+            print("Model path has been revised to {} to avoid collision. \n"
+                  "In principal, this shouldn't happen since model path has unique experiment ID.".format(
+                self.model_path))
+        model.save(self.model_path)
+
+    def __save_results(self, cv_results: Dict[list]) -> None:
+        """calculate and append CV test results to results/exp_results_all.csv"""
+        # compute mean and std of CV results
+        calculated_results = []
+        for metric_name in cv_results:
+            calculated_results[metric_name + C.MEAN_SUFFIX] = np.mean(cv_results[metric_name])
+            calculated_results[metric_name + C.STD_SUFFIX] = np.std(cv_results[metric_name])
+
+        # add ID to current results
+        calculated_results[C.EXP_COL_CONV[C.EXP_ID_COL]] = self.exp_ID
+
+        # retrieve previous results
+        try:
+            results_df = pd.read_csv(C.ALL_RES_CSV_PATH)
+        except IOError:
+            results_df = pd.read_csv(C.TEMPLATE_ALL_RES)
+
+        # save current results
+        results_df = results_df.append(calculated_results, ignore_index=True)
+        results_df.to_csv(C.ALL_RES_CSV_PATH, index=False)
+
+    def __save_exp_config(self) -> None:
+        """save current configuration to exp_ID_config.csv for easy retrieval"""
+        config_df = pd.read_csv(C.EXP_ID_LOG, dtype={C.EXP_ID_COL: int})
+        config_df = config_df.append(self.__compile_exp_dict(), ignore_index=True)
+        config_df.to_csv(C.EXP_ID_LOG, index=False)
 
     def __compile_exp_dict(self) -> dict:
         """compile experiment configuration dictionary"""

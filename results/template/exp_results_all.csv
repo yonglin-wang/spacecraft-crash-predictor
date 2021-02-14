@@ -1,1 +1,1 @@
-exp_ID,auc_tf,auc_sklearn,precision,recall,accuracy,f1,tn,fp,fn,tp,total
+experiment ID,auc_tf_mean,auc_tf_std,auc_sklearn_mean,auc_sklearn_std,precision_mean,precision_std,recall_mean,recall_std,accuracy_mean,accuracy_std,f1_mean,f1_std,tn_mean,tn_std,fp_mean,fp_std,fn_mean,fn_std,tp_mean,tp_std,total_mean,total_std

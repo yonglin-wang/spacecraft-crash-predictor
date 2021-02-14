@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Author: Yonglin Wang
 # Date: 2021/1/31 11:04 PM
@@ -33,6 +33,19 @@ def plot_history():
 
 def print_model_summary():
     """print model.summary only if model file exists"""
+
+
+def find_diff_and_compare(ids: list):
+    """show different str/number attributes in given lists of ids"""
+    # ensure all id exists
+
+
+def validate_id(id: int):
+    """ensure given experiment ID can be found in .csv file"""
+
+
+def summarize_datasets():
+    """summarize dataset stats of data sets under data directory, save as .csv"""
 
 
 def main():

@@ -239,7 +239,6 @@ def __rename_used_cols(df, train_cols: list):
 
 
 if __name__ == "__main__":
-    from processing.dataset_config import load_splits
-    loader = MARSDataLoader(window_size=2.0, time_ahead=1.0)
-    train_inds, test_inds, X_train, X_test, y_train, y_test = load_splits(loader, 1)
-    df = generate_all_feat_df(loader, 1, inds=test_inds)
+    from processing.dataset_config import load_dataset
+    loader = MARSDataLoader(window_size=2.0, time_ahead=1.0, rolling_step=0.7, verbose=True)
+

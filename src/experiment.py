@@ -7,17 +7,18 @@
 import os
 import argparse
 import time
-from typing import Union
+from typing import Tuple
+from collections import OrderedDict
 
 import numpy as np
-
 import tensorflow as tf
 from sklearn.metrics import confusion_matrix, roc_auc_score
 
 import consts as C
-from utils import display_exec_time
+from utils import calculate_exec_time
 from processing.marsdataloader import MARSDataLoader
-from processing.dataset_config import load_splits
+from processing.dataset_config import load_dataset
+from processing.split_data import Splitter
 from modeling.rnn import build_keras_rnn
 from recording.recorder import Recorder
 
@@ -46,7 +47,7 @@ def train(args: argparse.Namespace):
     loader = MARSDataLoader(args.window, args.ahead, args.rate, args.gap, args.rolling,
                             verbose=not args.silent, show_pbar=args.pbar)
     recorder = Recorder(loader, vars(args), verbose=not args.silent)
-    train_inds, test_inds, X_train, X_test, y_train, y_test = load_splits(loader, args.configID)
+
 
     # calculate class weight:
     if args.crash_ratio >= 1:
@@ -62,7 +63,91 @@ def train(args: argparse.Namespace):
     else:
         fit_ver = 2  # only one line per epoch in output file
 
-    # early stopping to save up GPU, stops training when there's no loss reduction in given epochs
+    X_all, y_all = load_dataset(loader, args.configID)
+
+    # get generator for splitting
+    splitter = Splitter(args.cv_mode, args.cv_splits, verbose=loader.verbose)
+    if args.cv_mode == C.NO_CV or args.cv_mode == C.KFOLD:
+        split_gen = splitter.split_ind_generator(y_all)
+    elif args.cv_mode == C.LEAVE_OUT:
+        split_gen = splitter.split_ind_generator(y_all, loader.retrieve_col("person"))
+    else:
+        raise NotImplementedError
+
+    # create results dictionary
+    all_split_results = OrderedDict([(metric_name, []) for metric_name in C.RES_COLS])
+
+    # record best performing stats and model for saving results
+    best_test_inds = None
+    best_y_preds = None
+    best_model = None
+    best_split_num = -1
+    best_performance_metric = 0
+    all_epochs = []
+    all_training_history = []
+
+    for split_number, (train_inds, test_inds) in enumerate(split_gen):
+        # validate data size
+        assert loader.total_sample_size == train_inds.shape[0] + test_inds.shape[0], "train test numbers don't add up"
+
+        if loader.verbose:
+            print(f"Now training split #{split_number + 1} out of total {args.cv_splits}...")
+
+        # train split
+        train_hist, model, test_results, y_preds = train_one_split(args, loader,
+                                                          X_all, y_all,
+                                                          train_inds, test_inds,
+                                                          fit_ver, class_weight)
+        # append split results
+        for metric_name in all_split_results:
+            all_split_results[metric_name].append(test_results[metric_name])
+
+        # record stats
+        all_training_history.append(train_hist.history)
+        all_epochs.append(train_hist.epoch)
+
+        # compare results and save best performing set of objects for recording
+        if test_results[C.PERF_METRIC] > best_performance_metric:
+            best_performance_metric = test_results[C.PERF_METRIC]
+            best_test_inds = test_inds
+            best_y_preds = y_preds
+            best_model = model
+            best_split_num = split_number
+
+    # record experiment outputs
+    assert best_split_num >= 0 and best_test_inds and best_y_preds and best_performance_metric, "update best failed"
+    time_str = calculate_exec_time(begin, scr_name="experiment.py", verbose=loader.verbose)
+    recorder.record_experiment(all_split_results,
+                               time_str,
+                               all_epochs,
+                               model=best_model,
+                               train_history=all_training_history)
+
+    # output predictions and input to csv if needed
+    if args.save_output:
+        recorder.save_predictions(best_test_inds, best_y_preds)
+
+
+def train_one_split(args: argparse.Namespace,
+                    loader: MARSDataLoader,
+                    X_all: np.ndarray,
+                    y_all: np.ndarray,
+                    train_inds: np.ndarray,
+                    test_inds: np.ndarray,
+                    fit_ver: int,
+                    class_weight: dict
+                    ) -> Tuple[tf.keras.callbacks.History, tf.keras.Sequential, dict, np.ndarray]:
+    """function that trains a model and returns train history, the model, and test set results dictionary"""
+    # get train and test data from indices
+    X_train = X_all[train_inds]
+    X_test = X_all[test_inds]
+    y_train = y_all[train_inds]
+    y_test = y_all[test_inds]
+
+    if loader.verbose:
+        # print split info
+        print_split_info(train_inds, test_inds, X_train, X_test, y_train, y_test)
+
     if args.early_stop:
         callback = [tf.keras.callbacks.EarlyStopping(monitor=args.conv_crit,
                                                      patience=args.patience,
@@ -72,14 +157,7 @@ def train(args: argparse.Namespace):
 
     # ### start training
     # build model
-    if args.model in C.RNN_MODELS:
-        model = build_keras_rnn(X_train.shape[1],
-                                X_train.shape[2],
-                                rnn_out_dim=args.hidden_dim,
-                                dropout_rate=args.dropout,
-                                rnn_type=args.model)
-    else:
-        raise NotImplementedError("Model {} has not been implemented!".format(args.model))
+    model = match_and_build_model(args, X_train)
 
     # train model
     history = model.fit(
@@ -93,7 +171,7 @@ def train(args: argparse.Namespace):
         callbacks=callback
     )
 
-    time_str = display_exec_time(begin, scr_name="model.py")
+    # time_str = display_exec_time(begin, scr_name="model.py")
 
     # ### Evaluate model
     if not args.silent:
@@ -111,57 +189,11 @@ def train(args: argparse.Namespace):
     if not args.silent:
         print("Evaluation done, results: {}".format(eval_res))
 
-    # record experiment
-    recorder.record_experiment(results, time_str, model, train_history=history)
-
-    # output predictions and input to csv if needed
-    if args.save_output:
-        recorder.save_predictions(test_inds, y_pred)
+    return history, model, results, y_pred
 
 
-def train_CV(args: argparse.Namespace):
-    # ### Begin script
-    # confirm TensorFlow sees the GPU
-    # assert 'GPU' in str(device_lib.list_local_devices()), "TensorFlow cannot find GPU"
-    #
-    # # confirm Keras sees the GPU (for TensorFlow 1.X + Keras)
-    # assert len(tensorflow_backend._get_available_gpus()) > 0, "Keras cannot find GPU"
-
-    # ### time the script
-    begin = time.time()
-
-    # ### prepare data and other args
-    loader = MARSDataLoader(args.window, args.ahead, args.rate, args.gap, args.rolling,
-                            verbose=not args.silent, show_pbar=args.pbar)
-    recorder = Recorder(loader, vars(args), verbose=not args.silent)
-    train_inds, test_inds, X_train, X_test, y_train, y_test = load_splits(loader, args.configID)
-
-    # calculate class weight:
-    if args.crash_ratio >= 1:
-        class_weight = {0: 1, 1: args.crash_ratio}
-    elif args.crash_ratio <= 0:
-        raise ValueError("Crash ratio must be positive!")
-    else:
-        class_weight = {0: 1 - args.crash_ratio, 1: args.crash_ratio}
-
-    # prepare args
-    if args.pbar:
-        fit_ver = 1
-    else:
-        fit_ver = 2  # only one line per epoch in output file
-
-    # TODO k-fold CV split, StratifiedKFold
-
-    # early stopping to save up GPU, stops training when there's no loss reduction in given epochs
-    if args.early_stop:
-        callback = [tf.keras.callbacks.EarlyStopping(monitor=args.conv_crit,
-                                                     patience=args.patience,
-                                                     mode=C.CONV_MODE[args.conv_crit])]
-    else:
-        callback = None
-
-    # ### start training
-    # build model
+def match_and_build_model(args, X_train: np.ndarray)->tf.keras.Sequential:
+    """helper function to return correct model based on given input"""
     if args.model in C.RNN_MODELS:
         model = build_keras_rnn(X_train.shape[1],
                                 X_train.shape[2],
@@ -171,47 +203,37 @@ def train_CV(args: argparse.Namespace):
     else:
         raise NotImplementedError("Model {} has not been implemented!".format(args.model))
 
-    # train model
-    history = model.fit(
-        X_train, y_train,
-        epochs=args.max_epoch,
-        batch_size=args.batch_size,
-        validation_split=0.1,
-        verbose=fit_ver,
-        shuffle=False,
-        class_weight=class_weight,
-        callbacks=callback
-    )
+    return model
 
-    time_str = display_exec_time(begin, scr_name="model.py")
 
-    # ### Evaluate model
-    if not args.silent:
-        print("Now evaluating, metrics used: {}".format(model.metrics_names))
+def compute_test_results(y_pred, y_true, y_proba, eval_res):
+    """helper function to compute and return dictionary containing all results"""
 
-    # generate result stats
-    eval_res = model.evaluate(X_test, y_test, return_dict=True, verbose=int(args.pbar))
-    y_pred_proba = model.predict(X_test)
-    y_pred = y_pred_proba.copy()
-    y_pred[y_pred >= args.threshold] = 1
-    y_pred[y_pred < args.threshold] = 0
-    results = compute_test_results(y_pred, y_test, y_pred_proba, eval_res)
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
 
-    # print test set results:
-    if not args.silent:
-        print("Evaluation done, results: {}".format(eval_res))
+    output = {
+                "total": int(y_pred.shape[0]),
+                "tn": int(tn),
+                "fp": int(fp),
+                "fn": int(fn),
+                "tp": int(tp),
+                "accuracy": eval_res[C.ACC],
+                "precision": eval_res[C.PRECISION],
+                "recall": eval_res[C.RECALL],
+                "auc_tf": eval_res[C.AUC],
+                "auc_sklearn": roc_auc_score(y_true, y_proba),
+                "f1": (2 * eval_res[C.PRECISION] * eval_res[C.RECALL])/(eval_res[C.PRECISION] + eval_res[C.RECALL])
+            }
 
-    # record experiment
-    recorder.record_experiment(results, time_str, model, train_history=history)
+    # assert no difference between this and predefined output columns
+    assert not set(output.keys()).difference(set(C.RES_COLS)), "output eval metrics don't match existing columns"
 
-    # output predictions and input to csv if needed
-    if args.save_output:
-        recorder.save_predictions(test_inds, y_pred)
+    return output
 
 
 def print_training_info(args: argparse.Namespace):
     """helper function to print training information"""
-    print("*=*" * 20)
+    print("\n" + "*=*" * 20)
     print("Training information:")
     print(f"Now training model with {int(args.window * 1000)}ms scale, {int(args.ahead * 1000)}ms ahead.\n"
           f"Early Stopping? {args.early_stop}\n"
@@ -222,28 +244,36 @@ def print_training_info(args: argparse.Namespace):
 
     print("Note to this experiment: {}".format(args.notes))
 
+    if args.cv_mode == C.NO_CV or args.cv_splits == 1:
+        print(f"No cross validation, using a default {C.TEST_SIZE} test size split.")
+    elif args.cv_mode == C.KFOLD:
+        print(f"Currently training with {args.cv_splits}-fold cross validation.")
+    elif args.cv_mode == C.LEAVE_OUT:
+        print(f"Currently training with leave n out with total of {args.cv_splits} splits.")
+    else:
+        raise NotImplementedError(f"cannot recognize {args.cv_mode}")
 
-def compute_test_results(y_pred, y_true, y_proba, eval_res):
-    """helper function to compute and return dictionary with following keys:
-    accuracy,precision,recall,auc,f1,tn,fp,fn,tp
-    """
 
-    # TODO change to metrics to list and average metrics for CV
-
-    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
-    return {
-        "total": int(y_pred.shape[0]),
-        "tn": int(tn),
-        "fp": int(fp),
-        "fn": int(fn),
-        "tp": int(tp),
-        "accuracy": eval_res[C.ACC],
-        "precision": eval_res[C.PRECISION],
-        "recall": eval_res[C.RECALL],
-        "auc_tf": eval_res[C.AUC],
-        "auc_sklearn": roc_auc_score(y_true, y_proba),
-        "f1": (2 * eval_res[C.PRECISION] * eval_res[C.RECALL])/(eval_res[C.PRECISION] + eval_res[C.RECALL])
-    }
+def print_split_info(inds_train, inds_test, X_train, X_test, y_train, y_test):
+    """print shapes of split"""
+    print(
+        "Train-test split Information\n"
+        "Total sample size: {:>16}\n"
+        "Train sample size: {:>16}\n"
+        "Test sample size: {:>17}\n"
+        "Input shapes:\n"
+        "X_train shape: {:>20}\n"
+        "X_test shape: {:>21}\n"
+        "y_train shape: {:>20}\n"
+        "y_test shape: {:>21}\n".
+            format(inds_train.shape[0] + inds_test.shape[0],
+                   inds_train.shape[0],
+                   inds_test.shape[0],
+                   str(X_train.shape),
+                   str(X_test.shape),
+                   str(y_train.shape),
+                   str(y_test.shape))
+    )
 
 
 def main():
@@ -306,11 +336,11 @@ def main():
         '--max_epoch', type=int, default=50,
         help='highest number of epochs allowed in experiment')
     argparser.add_argument(
-        '--cv', action='store_true',
-        help='whether to run k-fold cross-validation on dataset; 1 split if not selected')
+        '--cv_mode', type=str.lower, default=C.NO_CV, choices=C.CV_OPTIONS,
+        help='cv mode to use. disable: no CV; kfold: stratified K-fold; leave out: leave N subject(s) out')
     argparser.add_argument(
-        '--k_fold', type=int, default=10,
-        help='number of k folds, if cross-validation selected')
+        '--cv_splits', type=int, default=5,
+        help='total number of splits in CV strategy. A split number of 1 is the same as disable CV.')
 
     # Experiment annotation
     argparser.add_argument(
@@ -330,12 +360,13 @@ def main():
     else:
         print_training_info(args)
 
-    if args.cv:
-        # if k-fold CV, run a different function
-        train_CV(args)
-    else:
-        # if not k-fold, run 1 split training
-        train(args)
+    train(args)
+    # if args.cv:
+    #     # if k-fold CV, run a different function
+    #     train_CV(args)
+    # else:
+    #     # if not k-fold, run 1 split training
+    #     train(args)
 
 
 if __name__=="__main__":
