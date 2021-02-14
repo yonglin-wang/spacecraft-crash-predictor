@@ -14,7 +14,7 @@ Among other required packages, we crucially need to make sure the following vers
 - keras 2.4.3 (```$ pip install keras==2.4.3```)
 - numpy 1.19.2 (```$ pip install numpy==1.19.2```)
 
-## Notes to installing on HPCC
+### Notes to installing on HPCC
 
 These are the exact steps I used to install the exact versions listed above:
 
@@ -38,6 +38,10 @@ These are the exact steps I used to install the exact versions listed above:
    $ pip install keras==2.4.3
    $ pip install numpy==1.19.2
    ```
+
+## Dataset Requirement
+
+In order to run the code properly, you'll need to put under [data/](data/) directory the raw data file ```data_all.csv```, which contains all the raw data under columns listed in ```ESSENTIAL_RAW_COLS``` in [consts.py](src/consts.py).
 
 # Run Experiments
 
