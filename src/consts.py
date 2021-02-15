@@ -64,15 +64,17 @@ LOADER_BASENAME = "dataloader.pkl"
 CONFIG_IDS = {1, 2, 3}
 
 # train test split config constants
-TEST_SIZE = 0.2
+TEST_SIZE = 0.1
 USED_COL_FORMAT = "{}_InTrain"
 
-# configuration specific details, if seperate prediction in future
+# configuration specific details
 COLS_USED = "cols_used"
 CONFIG_OVERVIEW = "config_overview"
 CONFIG_SPECS = {
     1: {
-        # columns used in configuration; name strings identical to COL_PATHS
+        # columns used in configuration; Requirements:
+        # 1) name strings identical to keys in COL_PATHS
+        # 2) order identical to output in dataset_config.py
         COLS_USED: ['position', 'velocity', 'joystick'],
         # concise description of this configuration
         CONFIG_OVERVIEW: "basic triple (orig vel)"},
@@ -81,9 +83,10 @@ CONFIG_SPECS = {
     3: {COLS_USED: ['position', 'velocity', 'joystick', 'destabilizing'],
         CONFIG_OVERVIEW: "basic triple (orig vel) + destab."}
 }
+NORMALIZABLE_FEATS = {'position', 'velocity', 'velocity_cal'}
 
 # -----
-# Model Constants
+# Model Training Constants
 # -----
 
 # convergence criteria, must be consistent with what EarlyStopping supports
