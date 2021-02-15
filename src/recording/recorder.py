@@ -60,7 +60,9 @@ class Recorder():
         # to be recorded on record_experiment
         self.history = None  # hisotry dict from keras history object, if any passed
         self.time_taken = None
-        self.total_epochs = None
+        self.average_epochs = 0
+        self.std_epochs = 0
+        self.best_split = -1     # index of the best performing split, 0-based
 
         if self.verbose:
             print("Now recording experiment #{}".format(self.exp_ID))
@@ -69,21 +71,24 @@ class Recorder():
                           test_results: dict,
                           time_taken: str,
                           epoch_list: list,
+                          best_split: int,
                           model: Sequential = None,
-                          train_history: list = None):
+                          train_history: list = None,
+                          save_model: bool = False):
         """record experiment configuration and statistics"""
         # link references
         if train_history:
             self.history = train_history
         self.average_epochs = float(np.mean(epoch_list))
         self.std_epochs = float(np.std(epoch_list))
+        self.best_split = best_split
         self.time_taken = time_taken
 
         # create new path in results and experiment folders
         if not os.path.exists(self.exp_dir):
             os.mkdir(self.exp_dir)
 
-        if model:
+        if model is not None and save_model:
             self.__save_model(model)
 
         # append test set metrics to results/exp_results_all.csv
@@ -91,6 +96,9 @@ class Recorder():
 
         # once all of the above done, append experiment info to results/exp_ID_config.csv
         self.__save_exp_config()
+
+        # pickle this recorder to its path
+        pickle.dump(self, open(self.recorder_path, "wb"))
 
         if self.verbose:
             print("Experiment {} recorded successfully!".format(self.exp_ID))
@@ -127,16 +135,17 @@ class Recorder():
                 self.model_path))
         model.save(self.model_path)
 
-    def __save_results(self, cv_results: Dict[list]) -> None:
+    def __save_results(self, cv_results: Dict[str, list]) -> None:
         """calculate and append CV test results to results/exp_results_all.csv"""
         # compute mean and std of CV results
-        calculated_results = []
+        calculated_results = {}
         for metric_name in cv_results:
             calculated_results[metric_name + C.MEAN_SUFFIX] = np.mean(cv_results[metric_name])
             calculated_results[metric_name + C.STD_SUFFIX] = np.std(cv_results[metric_name])
 
         # add ID to current results
         calculated_results[C.EXP_COL_CONV[C.EXP_ID_COL]] = self.exp_ID
+        calculated_results[C.CONFIG_DESC_COL_NAME] = C.CONFIG_SPECS[self.configID][C.CONFIG_OVERVIEW]
 
         # retrieve previous results
         try:
