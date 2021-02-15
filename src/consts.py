@@ -79,7 +79,7 @@ CONFIG_SPECS = {
     2: {COLS_USED: ['position', 'velocity_cal', 'joystick'],
         CONFIG_OVERVIEW: "basic triple (calc vel)"},
     3: {COLS_USED: ['position', 'velocity', 'joystick', 'destabilizing'],
-        CONFIG_OVERVIEW: "basic triple (orig vel)"}
+        CONFIG_OVERVIEW: "basic triple (orig vel) + destab."}
 }
 
 # -----
@@ -112,7 +112,7 @@ ACC = "accuracy"
 MODEL_PATH = "model"
 
 # default training notes
-DEFAULT_NOTES = "None Entered."
+DEFAULT_NOTES = "none entered."
 
 # -----
 # Recorder Constants
@@ -162,10 +162,11 @@ EXP_COL_CONV = OrderedDict([('exp_ID', 'experiment ID'),
                             ('pred_path', 'prediction path'),
                             ('model_path', 'model save path'),
                             ('recorder_path', 'recorder save path')])
+CONFIG_DESC_COL_NAME = "dataset config desc"
 
 # results .csv values
 PERF_METRIC = 'auc_sklearn'
-RES_COLS = ['auc_tf', 'auc_sklearn', 'precision', 'recall', 'accuracy', 'f1', 'tn', 'fp', 'fn', 'tp', 'total']
+RES_COLS = ['auc_tf', 'auc_sklearn', 'precision', 'recall', 'f1', 'accuracy', 'tn', 'fp', 'fn', 'tp', 'total']
 ALL_RES_CSV_PATH = os.path.join(RESULT_DIR, "exp_results_all.csv")
 TEMPLATE_ALL_RES = os.path.join(RESULT_DIR, "template", "exp_results_all.csv")
 MEAN_SUFFIX = "_mean"
@@ -177,4 +178,4 @@ REC_PATH = "recorder.pkl"
 # -----
 # Splitter Constants
 # -----
-SPLIT_MODES = [KFOLD, LEAVE_OUT]
+SPLIT_MODES = [KFOLD, LEAVE_OUT, NO_CV]
