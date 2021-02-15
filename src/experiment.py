@@ -104,7 +104,7 @@ def train(args: argparse.Namespace):
 
         # record stats
         all_training_history.append(train_hist.history)
-        all_epochs.append(train_hist.epoch)
+        all_epochs.append(len(train_hist.epoch))
 
         # compare results and save best performing set of objects for recording
         if test_results[C.PERF_METRIC] > best_performance_metric:
@@ -115,16 +115,21 @@ def train(args: argparse.Namespace):
             best_split_num = split_number
 
     # record experiment outputs
-    assert best_split_num >= 0 and best_test_inds and best_y_preds and best_performance_metric, "update best failed"
+    assert best_split_num >= 0 \
+           and best_test_inds is not None \
+           and best_y_preds is not None \
+           and best_performance_metric > 0, "update best failed"
     time_str = calculate_exec_time(begin, scr_name="experiment.py", verbose=loader.verbose)
     recorder.record_experiment(all_split_results,
                                time_str,
                                all_epochs,
+                               best_split_num,
                                model=best_model,
-                               train_history=all_training_history)
+                               train_history=all_training_history,
+                               save_model=args.save_model)
 
     # output predictions and input to csv if needed
-    if args.save_output:
+    if args.save_preds:
         recorder.save_predictions(best_test_inds, best_y_preds)
 
 
@@ -171,9 +176,7 @@ def train_one_split(args: argparse.Namespace,
         callbacks=callback
     )
 
-    # time_str = display_exec_time(begin, scr_name="model.py")
-
-    # ### Evaluate model
+    # Evaluate model
     if not args.silent:
         print("Now evaluating, metrics used: {}".format(model.metrics_names))
 
@@ -237,10 +240,10 @@ def print_training_info(args: argparse.Namespace):
     print("Training information:")
     print(f"Now training model with {int(args.window * 1000)}ms scale, {int(args.ahead * 1000)}ms ahead.\n"
           f"Early Stopping? {args.early_stop}\n"
-          f"Using Dataset Configuration #{args.configID}\n")
+          f"Using Dataset Configuration #{args.configID}")
 
     if args.early_stop:
-        print(f"Stopping early if no {args.conv_crit} improvement in {args.patience} epochs.\n")
+        print(f"Stopping early if no {args.conv_crit} improvement in {args.patience} epochs.")
 
     print("Note to this experiment: {}".format(args.notes))
 
@@ -253,6 +256,8 @@ def print_training_info(args: argparse.Namespace):
     else:
         raise NotImplementedError(f"cannot recognize {args.cv_mode}")
 
+    print("\n\n")
+
 
 def print_split_info(inds_train, inds_test, X_train, X_test, y_train, y_test):
     """print shapes of split"""
@@ -260,7 +265,9 @@ def print_split_info(inds_train, inds_test, X_train, X_test, y_train, y_test):
         "Train-test split Information\n"
         "Total sample size: {:>16}\n"
         "Train sample size: {:>16}\n"
+        "Train crash number: {:>15}\n"
         "Test sample size: {:>17}\n"
+        "Test crash number: {:>16}\n"
         "Input shapes:\n"
         "X_train shape: {:>20}\n"
         "X_test shape: {:>21}\n"
@@ -268,7 +275,9 @@ def print_split_info(inds_train, inds_test, X_train, X_test, y_train, y_test):
         "y_test shape: {:>21}\n".
             format(inds_train.shape[0] + inds_test.shape[0],
                    inds_train.shape[0],
+                   int(sum(y_train==1)),
                    inds_test.shape[0],
+                   int(sum(y_test == 1)),
                    str(X_train.shape),
                    str(X_test.shape),
                    str(y_train.shape),
@@ -337,9 +346,9 @@ def main():
         help='highest number of epochs allowed in experiment')
     argparser.add_argument(
         '--cv_mode', type=str.lower, default=C.NO_CV, choices=C.CV_OPTIONS,
-        help='cv mode to use. disable: no CV; kfold: stratified K-fold; leave out: leave N subject(s) out')
+        help='cv mode to use. disable: no CV; kfold: stratified K-fold; leave_out: leave N subject(s) out')
     argparser.add_argument(
-        '--cv_splits', type=int, default=5,
+        '--cv_splits', type=int, default=1,
         help='total number of splits in CV strategy. A split number of 1 is the same as disable CV.')
 
     # Experiment annotation
@@ -347,8 +356,11 @@ def main():
         '--notes', type=str.lower, default=C.DEFAULT_NOTES,
         help='Notes for this experiment')
     argparser.add_argument(
-        '--save_output', action='store_true',
+        '--save_preds', action='store_true',
         help='whether to save model test input and output as .csv data')
+    argparser.add_argument(
+        '--save_model', action='store_true',
+        help='whether to save model in no CV or best performing model in CV')
     argparser.add_argument(
         '--pbar', action='store_true',
         help='whether to display progress bar during training. If not selected, outputs one line per epoch.')
@@ -361,13 +373,6 @@ def main():
         print_training_info(args)
 
     train(args)
-    # if args.cv:
-    #     # if k-fold CV, run a different function
-    #     train_CV(args)
-    # else:
-    #     # if not k-fold, run 1 split training
-    #     train(args)
-
 
 if __name__=="__main__":
     main()

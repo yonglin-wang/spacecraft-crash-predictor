@@ -17,7 +17,8 @@ class Splitter:
         # check preconditions
         if mode not in C.SPLIT_MODES:
             raise ValueError(f"Cannot recognize mode name {mode}")
-        assert n_splits >= 1, "Number of splits must be positive."
+        if n_splits < 1:
+            raise ValueError(f"Number of splits ({n_splits}) must be positive.")
 
         self.n_splits = n_splits
         self.verbose = verbose
@@ -52,7 +53,7 @@ class Splitter:
                 return self.__leave_out(y, subject_names)
 
     def __no_iter(self, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """placeholder iterator that yields the entire dataset once"""
+        """placeholder iterator that yields one split"""
         train_inds, test_inds = train_test_split(np.arange(y.shape[0]),
                                                  test_size=C.TEST_SIZE,
                                                  random_state=C.RANDOM_SEED)
@@ -61,11 +62,22 @@ class Splitter:
     def __kfold(self, y: np.ndarray):
         """wrapper for sklearn stratified K fold iterator"""
         assert type(self.splitter) == StratifiedKFold
-        yield from self.splitter.split(np.zeros(y.shape[0]), y)
+        split_gen = self.splitter.split(np.zeros(y.shape[0]), y)
+        while 1:
+            try:
+                train_inds, test_inds = next(split_gen)
+
+                # must shuffle order, or RNN won't learn!!
+                np.random.shuffle(train_inds)
+                np.random.shuffle(test_inds)
+
+                yield train_inds, test_inds
+            except StopIteration:
+                return
 
     def __leave_out(self, y, names):
         """generate data based on subject names"""
-        # TODO implement with try-except StopIteration
+        # TODO implement with try-except StopIteration, don't forget to shuffle output
         raise NotImplementedError()
 
 if __name__ == "__main__":
