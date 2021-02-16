@@ -143,7 +143,7 @@ class MARSDataLoader():
         """
         returns basic triples of shape (n, sample_rate, 3), last dimension in order of (vel, pos, joystick)
         :param vel_mode: velocity mode
-        :return: basic data triples
+        :return: basic data triples, columns in the order of velocity, position, and joystick
         """
         # get velocity (n, sample_rate)
         if vel_mode == C.ORIGINAL:

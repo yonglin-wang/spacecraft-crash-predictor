@@ -119,7 +119,7 @@ def train(args: argparse.Namespace):
            and best_test_inds is not None \
            and best_y_preds is not None \
            and best_performance_metric > 0, "update best failed"
-    time_str = calculate_exec_time(begin, scr_name="experiment.py", verbose=loader.verbose)
+    time_str = calculate_exec_time(begin, scr_name=__file__, verbose=loader.verbose)
     recorder.record_experiment(all_split_results,
                                time_str,
                                all_epochs,
@@ -148,6 +148,11 @@ def train_one_split(args: argparse.Namespace,
     X_test = X_all[test_inds]
     y_train = y_all[train_inds]
     y_test = y_all[test_inds]
+
+    # normalize features if needed
+    if args.normalize != C.NO_NORM:
+        norm_feat_inds = find_col_inds_for_normalization(args.configID, args.normalize)
+        X_train, X_test = normalize_col(norm_feat_inds, X_train, X_test)
 
     if loader.verbose:
         # print split info
@@ -193,6 +198,48 @@ def train_one_split(args: argparse.Namespace,
         print("Evaluation done, results: {}".format(eval_res))
 
     return history, model, results, y_pred
+
+
+def normalize_col(col_inds: list,
+                  train_data: np.ndarray,
+                  test_data: np.ndarray,
+                  inplace=False) -> Tuple[np.ndarray, np.ndarray]:
+    assert train_data.ndim == 3 and test_data.ndim == 3, "train test arrays passed not 3D"
+
+    if not inplace:
+        train_data = train_data.copy()
+        test_data = test_data.copy()
+
+    for col_ind in col_inds:
+        # find mean and std using training set
+        train_mean = np.mean(train_data[:, :, col_ind:col_ind + 1])
+        train_std = np.std(train_data[:, :, col_ind:col_ind + 1])
+
+        # use mean and std to normalize both train and test data
+        train_data[:, :, col_ind:col_ind + 1] = (train_data[:, :, col_ind:col_ind + 1] - train_mean) / train_std
+        test_data[:, :, col_ind:col_ind + 1] = (test_data[:, :, col_ind:col_ind + 1] - train_mean) / train_std
+
+        # assertion to make sure col normalized correctly
+        assert np.isclose(np.std(train_data[:, :, col_ind:col_ind + 1]), 1) and \
+               np.isclose(np.mean(train_data[:, :, col_ind:col_ind + 1]), 0)
+
+    return train_data, test_data
+
+
+def find_col_inds_for_normalization(config_ID: int, mode: str) -> list:
+    assert config_ID in C.CONFIG_SPECS, f"Cannot recognize configuration ID {config_ID}"
+    assert mode in C.NORMALIZATION_MODES
+
+    feat_names = C.CONFIG_SPECS[config_ID][C.COLS_USED]
+
+    if mode == C.NORM_ALL:
+        # return indices of all non categorical features
+        return [ind for ind, feat in enumerate(feat_names) if feat not in C.CATEGORICAL_FEATS]
+    elif mode == C.NORM_LARGE:
+        # return indices of all present large-value features
+        return [ind for ind, feat in enumerate(feat_names) if feat in C.LARGE_VAL_FEATS]
+    else:
+        raise NotImplementedError()
 
 
 def match_and_build_model(args, X_train: np.ndarray)->tf.keras.Sequential:
@@ -256,7 +303,7 @@ def print_training_info(args: argparse.Namespace):
     else:
         raise NotImplementedError(f"cannot recognize {args.cv_mode}")
 
-    print("\n\n")
+    print("")
 
 
 def print_split_info(inds_train, inds_test, X_train, X_test, y_train, y_test):
@@ -323,6 +370,12 @@ def main():
 
     # Model specific flags
     argparser.add_argument(
+        '--normalize', type=str.lower, default=C.NO_NORM, choices=C.NORMALIZATION_MODES,
+        help=f'Normalization modes: '
+             f'{C.NO_NORM}: no normalization; '
+             f'{C.NORM_ALL}: normalize all non-categorical features; '
+             f'{C.NORM_LARGE}: normalize the following large-value features, if present: {", ".join(C.LARGE_VAL_FEATS)}')
+    argparser.add_argument(
         '--model', type=str.lower, default=C.LSTM, choices=C.AVAILABLE_MODELS,
         help='type of model used')
     argparser.add_argument(
@@ -346,7 +399,7 @@ def main():
         help='highest number of epochs allowed in experiment')
     argparser.add_argument(
         '--cv_mode', type=str.lower, default=C.NO_CV, choices=C.CV_OPTIONS,
-        help='cv mode to use. disable: no CV; kfold: stratified K-fold; leave_out: leave N subject(s) out')
+        help=f'cv mode to use. {C.NO_CV}: no CV; {C.KFOLD}: stratified K-fold; {C.LEAVE_OUT}: leave N subject(s) out')
     argparser.add_argument(
         '--cv_splits', type=int, default=1,
         help='total number of splits in CV strategy. A split number of 1 is the same as disable CV.')

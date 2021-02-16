@@ -278,7 +278,7 @@ def generate_feature_files(window_size: float,
                 # iterate through each valid crash to create data entry
                 for crash_time in valid_crash_entries.seconds:
 
-                    # ### (1/2) Extract Crash Events in each group
+                    # ### (1/2) Extract Crash Events in each trial-person combination
                     # find corresponding data points between time scale start and crash event to generate training data
                     entries_for_train = trial_raw_data[trial_raw_data.seconds.between(
                         crash_time - window_size - time_ahead, crash_time - time_ahead)]

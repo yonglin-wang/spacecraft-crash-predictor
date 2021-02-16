@@ -65,6 +65,8 @@ CONFIG_IDS = {1, 2, 3}
 
 # train test split config constants
 TEST_SIZE = 0.1
+
+# for marking columns used in training in the output prediction file
 USED_COL_FORMAT = "{}_InTrain"
 
 # configuration specific details
@@ -75,15 +77,23 @@ CONFIG_SPECS = {
         # columns used in configuration; Requirements:
         # 1) name strings identical to keys in COL_PATHS
         # 2) order identical to output in dataset_config.py
-        COLS_USED: ['position', 'velocity', 'joystick'],
+        COLS_USED: ['velocity', 'position', 'joystick'],
         # concise description of this configuration
         CONFIG_OVERVIEW: "basic triple (orig vel)"},
-    2: {COLS_USED: ['position', 'velocity_cal', 'joystick'],
+    2: {COLS_USED: ['velocity_cal', 'position', 'joystick'],
         CONFIG_OVERVIEW: "basic triple (calc vel)"},
-    3: {COLS_USED: ['position', 'velocity', 'joystick', 'destabilizing'],
+    3: {COLS_USED: ['velocity', 'position', 'joystick', 'destabilizing'],
         CONFIG_OVERVIEW: "basic triple (orig vel) + destab."}
 }
-NORMALIZABLE_FEATS = {'position', 'velocity', 'velocity_cal'}
+
+# parameters related to feature normalization
+NO_NORM = 'disable'
+NORM_LARGE = 'large'
+NORM_ALL = 'all'
+NORMALIZATION_MODES = [NO_NORM, NORM_LARGE, NORM_ALL]
+# features with larger values for partial normalization
+LARGE_VAL_FEATS = {'position', 'velocity', 'velocity_cal'}
+CATEGORICAL_FEATS = {'destabilizing'}
 
 # -----
 # Model Training Constants
@@ -177,6 +187,9 @@ STD_SUFFIX = "_std"
 
 # name for recorder file
 REC_PATH = "recorder.pkl"
+
+# file for recording unique IDs
+EXP_ID_RECORD = os.path.join(RESULT_DIR, ".expIDs")
 
 # -----
 # Splitter Constants
