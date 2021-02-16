@@ -99,7 +99,7 @@ Whenever a new feature is proposed:
 
 ## Code for New Feature Combination (i.e. Configuration of Datasets used in Training)
 Whenever a new feature combination is proposed:
-1. Pick a unique intger ```n ``` as your ```config_id```, e.g. ```100```, and put it in set ```CONFIG_IDS``` in [consts.py](src/consts.py)
+1. Pick a unique intger ```n``` as your ```config_id```, e.g. ```100```, and put it in set ```CONFIG_IDS``` in [consts.py](src/consts.py)
 
 2. Write the configuration function with name in format similar to ```_generate_config_<n>``` in [dataset_config.py](src/processing/dataset_config.py), which takes at least a ```MARSDataLoader``` object and returns a 6-tuple of numpy arrays ```train_inds```, ```test_inds```, ```X_train```, ```X_test```, ```y_train```, ```y_test```
 
@@ -142,8 +142,10 @@ Whenever a new model build has been proposed:
 Whenever you need to add a new option to the experiment:
 
 1. add the option to ```argparser``` in ```main()``` in [experiment.py](src/experiment.py)
-2. if you'd like the argument to have a different display name in the [experiment configuration file](results/template/exp_ID_config.csv), add a ```('exp_ID', 'experiment ID')``` to the ```COL_CONV``` dictionary
+2. if you'd like the argument to have a different display name in the [experiment configuration file](results/template/exp_ID_config.csv), add a ```('<option name>', '<name to display in results file>')``` to the ```COL_CONV``` dictionary in [consts.py](src/consts.py), 
 3. new settings by default gets appended after the template columns. To have the new option appear in a specific place, add it to the template, and the change will be reflected after the experiment output has been cleared.
+
+Note: only numbers, booleans, and strings will be saved. See ```ACCEPTABLE_TYPES``` in [consts.py](src/consts.py).
 
 ## Clearing Experiment Output
 
