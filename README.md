@@ -92,8 +92,8 @@ Each experiment will be indexed with a unique ID number. The two tables can be j
 Whenever a new feature is proposed:
 1. Write its extraction function in [extract_features.py](src/processing/extract_features.py)
 2. In [consts.py](src/consts.py), add the feature name and column path to ```COL_PATHs``` dictionary
-3. If the feature has a range much larger than joystick's [-1, 1], e.g. position and velocity: this feature is a large value feature, and you should add its name to ```LARGE_VAL_FEATS``` in [consts.py](src/consts.py). In this way, the large features will be normalized to match joystick's range if a ```--normalize large``` option is specified.
-4. If the feature is boolean, e.g. destabilizing joystick deflection, add it to ```CATEGORICAL_FEATS``` in [consts.py](src/consts.py), since we crucially do NOT want to normalize them in any normalization mode.
+3. If a new, non-categorical feature has a range much larger than joystick's [-1, 1], e.g. position and velocity: this feature is a large value feature, and you should add its name to ```LARGE_VAL_FEATS``` in [consts.py](src/consts.py). In this way, the large features will be normalized to match joystick's range if a ```--normalize large``` option is specified.
+4. If the feature is categorical, e.g. destabilizing joystick deflection, add it to ```CATEGORICAL_FEATS``` in [consts.py](src/consts.py), since we crucially do NOT want to normalize them in any normalization mode.
 5. Add feature extraction function call as ```self._save_col(<function call and return>, <feature name>)``` in ```__init__``` method of [MARSDataLoader](src/processing/marsdataloader.py)
 6. When you initialize a new MARSDataLoader, it will automatically include the new feature.
 
