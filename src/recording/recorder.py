@@ -10,6 +10,7 @@ Experiment ID is generated from the exp_ID_config.csv file; 1 if file not exist
 import math
 import os
 import pickle
+import subprocess
 from datetime import date
 from typing import Union, Dict
 
@@ -145,7 +146,6 @@ class Recorder():
 
         # add ID to current results
         calculated_results[C.EXP_COL_CONV[C.EXP_ID_COL]] = self.exp_ID
-        calculated_results[C.CONFIG_DESC_COL_NAME] = C.CONFIG_SPECS[self.configID][C.CONFIG_OVERVIEW]
 
         # retrieve previous results
         try:
@@ -159,7 +159,12 @@ class Recorder():
 
     def __save_exp_config(self) -> None:
         """save current configuration to exp_ID_config.csv for easy retrieval"""
-        config_df = pd.read_csv(C.EXP_ID_LOG, dtype={C.EXP_ID_COL: int})
+        # load configuration file
+        if os.path.exists(C.EXP_ID_LOG):
+            config_df = pd.read_csv(C.EXP_ID_LOG, dtype={C.EXP_ID_COL: int})
+        else:
+            config_df = pd.read_csv(C.TEMPLATE_ID_LOG, dtype={C.EXP_ID_COL: int})
+
         config_df = config_df.append(self.__compile_exp_dict(), ignore_index=True)
         config_df.to_csv(C.EXP_ID_LOG, index=False)
 
@@ -179,6 +184,10 @@ class Recorder():
             else:
                 output[column] = value
 
+        # Lastly, add info not included in class fields.
+        # text description of dataset configuration (e.g. basic triple)
+        output[C.CONFIG_DESC_COL_NAME] = C.CONFIG_SPECS[self.configID][C.CONFIG_OVERVIEW]
+
         return output
 
     def predict_with_model(self, X_input: np.ndarray) -> np.ndarray:
@@ -196,21 +205,20 @@ class Recorder():
 
 
 def _find_next_exp_ID() -> int:
-    """helper to find the next unique exp ID in given exp dir"""
-    # find ID based on exp_ID_config.csv file
-    exp_id_col = C.EXP_COL_CONV[C.EXP_ID_COL]
+    """helper to find the next unique exp ID in given exp dir, fast operation to avoid collision"""
+    # find ID based on ID record file
     try:
-        df = pd.read_csv(C.EXP_ID_LOG, usecols=[exp_id_col])
-        max_ID = df[exp_id_col].max()
-        if math.isnan(max_ID):
-            # return 1 if no experiment recorded yet
-            return 1
-        else:
-            return max_ID + 1
-    except IOError:
-        # if file not exist, create one based on template
-        pd.read_csv(C.TEMPLATE_ID_LOG).to_csv(C.EXP_ID_LOG, index=False)
-        return 1
+        with open(C.EXP_ID_RECORD, "r") as id_file:
+            content = id_file.read()
+            next_id = int(content)
+    except:
+        next_id = 1
+
+    # save ID to record
+    with open(C.EXP_ID_RECORD, 'w') as count_file:
+        count_file.write(str(next_id + 1))
+
+    return next_id
 
 
 def _filter_values(vars_dict: dict)->dict:
