@@ -91,9 +91,11 @@ Each experiment will be indexed with a unique ID number. The two tables can be j
 ## Code for Extracting New Feature
 Whenever a new feature is proposed:
 1. Write its extraction function in [extract_features.py](src/processing/extract_features.py)
-2. Add feature name and column path to ```COL_PATHs``` dictionary in [consts.py](src/consts.py)
-3. Add feature extraction function call as ```self._save_col(<function call and return>, <feature name>)``` in ```__init__``` method of [MARSDataLoader](src/processing/marsdataloader.py)
-4. When you initialize a new MARSDataLoader, it will automatically include the new feature.
+2. In [consts.py](src/consts.py), add the feature name and column path to ```COL_PATHs``` dictionary
+3. If the feature has a range much larger than joystick's [-1, 1], e.g. position and velocity: this feature is a large value feature, and you should add its name to ```LARGE_VAL_FEATS``` in [consts.py](src/consts.py). In this way, the large features will be normalized to match joystick's range if a ```--normalize large``` option is specified.
+4. If the feature is boolean, e.g. destabilizing joystick deflection, add it to ```CATEGORICAL_FEATS``` in [consts.py](src/consts.py), since we crucially do NOT want to normalize them in any normalization mode.
+5. Add feature extraction function call as ```self._save_col(<function call and return>, <feature name>)``` in ```__init__``` method of [MARSDataLoader](src/processing/marsdataloader.py)
+6. When you initialize a new MARSDataLoader, it will automatically include the new feature.
 
 ## Code for New Feature Combination (i.e. Configuration of Datasets used in Training)
 Whenever a new feature combination is proposed:
@@ -133,4 +135,22 @@ Whenever a new model build has been proposed:
 
   Then, when you run ```experiment.py``` with ```--model <new model name>```, the new model will be used.
 
-  - Other models: TBD! Note: if not a Keras model, saving methods such as ```model.save()``` may not be compatible. 
+- Other models: TBD! Note: if not a Keras model, saving methods such as ```model.save()``` may not be compatible. 
+
+## Code for New Experiment Option
+
+Whenever you need to add a new option to the experiment:
+
+1. add the option to ```argparser``` in ```main()``` in [experiment.py](src/experiment.py)
+2. if you'd like the argument to have a different display name in the [experiment configuration file](results/template/exp_ID_config.csv), add a ```('exp_ID', 'experiment ID')``` to the ```COL_CONV``` dictionary
+3. new settings by default gets appended after the template columns. To have the new option appear in a specific place, add it to the template, and the change will be reflected after the experiment output has been cleared.
+
+## Clearing Experiment Output
+
+The code has been organized in a way that additional experiment options and evaluation metrics will be appended to the existing configuration file and results file as new columns, and missing columns will simply be left blank. Thus, there's no need to clear output for new code added.  
+
+However, if you'd still like to (e.g. due to bugs found in preprocessing code or model output), clear the following directories:
+
+- every visible file and directory under [data](data/) except for ```data_all.csv```
+- every visible file and directory under [results/](results/) except for the [template/](results/template) folder
+- every visible file and directory under [exp/](exp/)
