@@ -2,7 +2,7 @@
 
 This work is a part of a project accepted by TRISH's GoForLaunch program, with a greater aim to enhance human performance in space flights and postural balancing tasks. For details, see [Dr. Vimal's project description and research roadmap](https://sites.google.com/view/vivekanandpandeyvimal/research_2/current-research?authuser=0#h.on5o56f1ne5m). 
 
-This project aims to build a classifier that predicts spacecraft crashes in advance. Special thanks to [Jie Tang](https://github.com/TJmask), some of whose [code logic for the same task](https://github.com/TJmask/Space-Health-Predicting) has been especially helpful in building this project; Jie's name will be included the docstring sections of the functions, wherever credit is due. 
+This project aims to build a classifier that predicts potential spacecraft crashes in advance, based on the time series of the subject's control and status in a pre-defined window. 
 
 # Requirements
 
@@ -71,7 +71,9 @@ Under project root, run ```$ ./src/experiment.py -h``` to see all available argu
 
 # Examine Results
 
-Under ```./results/```, the ```experiment.py``` script automatically saves the the experiment configuration (in ```exp_ID_config.csv```) and result metrics (in ```exp_results_all.csv```). If these files don't exist upon recording, they will be created from the templates in ```./reasults/template```. 
+## Result Files
+
+Under [results/](results/), ```experiment.py``` script automatically saves the the experiment configuration (in ```exp_ID_config.csv```) and result metrics (in ```exp_results_all.csv```). If these files don't exist upon recording, they will be created from the templates in ```./reasults/template```. 
 
 Each experiment will be indexed with a unique ID number. The two tables can be joined on their first columns, i.e. on ```experiment ID``` or ```exp_ID```. ```exp_ID_config.csv``` contains configuration information such as:
 
@@ -85,6 +87,16 @@ Each experiment will be indexed with a unique ID number. The two tables can be j
 - confusion matrix on test set data
 - various metrics on test set data, such as AUC, F1, accuracy, precision, recall, etc.
 - if a CV strategy is used, standard deviation and mean of the metrics will be reported.
+
+## Merging Result Files
+
+The following command allows you to join ```exp_results_all.csv``` (left) and  ```exp_ID_config.csv``` (right) on ```experiment ID``` column and save the combined table to ```hpcc_results.csv```. 
+
+```
+$ ./src/summary.py --merge
+```
+
+To avoid overwriting existing merged files, An integer will be appended at the end of the output file
 
 # Dev Tips: How to Add New Code
 
@@ -156,3 +168,7 @@ However, if you'd still like to (e.g. due to bugs found in preprocessing code or
 - every visible file and directory under [data](data/) except for ```data_all.csv```
 - every visible file and directory under [results/](results/) except for the [template/](results/template) folder
 - every visible file and directory under [exp/](exp/)
+
+# Acknowledgements
+
+Special thanks to [Jie Tang](https://github.com/TJmask), some of whose [code logic for the same task](https://github.com/TJmask/Space-Health-Predicting) has been especially helpful in building this project; Jie's name will be included the docstring sections of the functions, wherever credit is due. 
