@@ -26,12 +26,12 @@ def merge_results(verbose: bool=False) -> None:
     # check output path to avoid overwriting previous combined results
     comb_output_path = C.COMBINED_FILE_FORMAT
     collision_n = 0
-    if os.path.exists(comb_output_path):
+    if os.path.exists(comb_output_path.format("")):
         while os.path.exists(comb_output_path.format("_" + str(collision_n))):
             collision_n += 1
         comb_output_path = comb_output_path.format("_" + str(collision_n))
     else:
-        comb_output_path = C.COMBINED_FILE_FORMAT.format("")
+        comb_output_path = comb_output_path.format("")
 
     # join and save
     if verbose:
