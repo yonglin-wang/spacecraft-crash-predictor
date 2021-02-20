@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 # Author: Yonglin Wang
 # Date: 2021/1/29
 """main class for parsing commandline input, creating DataLoader and training a model"""
@@ -398,10 +397,10 @@ def main():
         '--max_epoch', type=int, default=50,
         help='highest number of epochs allowed in experiment')
     argparser.add_argument(
-        '--cv_mode', type=str.lower, default=C.NO_CV, choices=C.CV_OPTIONS,
+        '--cv_mode', type=str.lower, default=C.KFOLD, choices=C.CV_OPTIONS,
         help=f'cv mode to use. {C.NO_CV}: no CV; {C.KFOLD}: stratified K-fold; {C.LEAVE_OUT}: leave N subject(s) out')
     argparser.add_argument(
-        '--cv_splits', type=int, default=1,
+        '--cv_splits', type=int, default=10,
         help='total number of splits in CV strategy. A split number of 1 is the same as disable CV.')
 
     # Experiment annotation

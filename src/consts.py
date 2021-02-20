@@ -175,6 +175,7 @@ EXP_COL_CONV = OrderedDict([('exp_ID', 'experiment ID'),
                             ('pred_path', 'prediction path'),
                             ('model_path', 'model save path'),
                             ('recorder_path', 'recorder save path')])
+# name of stray columns not from namespace
 CONFIG_DESC_COL_NAME = "dataset config desc"
 
 # results .csv values
@@ -195,3 +196,8 @@ EXP_ID_RECORD = os.path.join(RESULT_DIR, ".expIDs")
 # Splitter Constants
 # -----
 SPLIT_MODES = [KFOLD, LEAVE_OUT, NO_CV]
+
+# -----
+# Summary Constants
+# -----
+COMBINED_FILE_FORMAT = os.path.join(RESULT_DIR, "hpcc_results{}.csv")

@@ -59,11 +59,11 @@ class Recorder():
         self.recorder_path = os.path.join(self.exp_dir, C.REC_PATH)
 
         # to be recorded on record_experiment
-        self.history = None  # hisotry dict from keras history object, if any passed
-        self.time_taken = None
-        self.average_epochs = 0
-        self.std_epochs = 0
-        self.best_split = -1     # index of the best performing split, 0-based
+        self.history: dict = {}  # hisotry dict from keras history object, if any passed
+        self.time_taken: str = ""     # string of time taken in this experiment
+        self.average_epochs: float = 0
+        self.std_epochs: float = 0
+        self.best_split: int = -1     # index of the best performing split, 0-based
 
         if self.verbose:
             print("Now recording experiment #{}".format(self.exp_ID))
@@ -209,9 +209,8 @@ def _find_next_exp_ID() -> int:
     # find ID based on ID record file
     try:
         with open(C.EXP_ID_RECORD, "r") as id_file:
-            content = id_file.read()
-            next_id = int(content)
-    except:
+            next_id = int(id_file.read())
+    except IOError:
         next_id = 1
 
     # save ID to record
