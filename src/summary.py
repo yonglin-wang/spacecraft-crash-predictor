@@ -15,6 +15,8 @@ import consts as C
 def merge_results(verbose: bool=False) -> None:
     """merge results and configuration files into results/hpcc_results.csv"""
     # read files
+    if verbose:
+        print("Now loading csv files...")
     exp_ID_name = C.EXP_COL_CONV[C.EXP_ID_COL]
     res_df = pd.read_csv(C.ALL_RES_CSV_PATH, dtype={exp_ID_name: int}, index_col=exp_ID_name)
     config_df = pd.read_csv(C.EXP_ID_LOG, dtype={exp_ID_name: int}, index_col=exp_ID_name)
