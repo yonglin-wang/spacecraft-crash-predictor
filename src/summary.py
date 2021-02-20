@@ -36,7 +36,7 @@ def merge_results(verbose: bool=False) -> None:
         print(f"Now saving {len(res_df.index)} combined experiment entries to {comb_output_path}...")
     res_df.join(config_df, on=exp_ID_name).to_csv(comb_output_path)
     if verbose:
-    print("Done!")
+        print("Done!")
 
 def main():
 
