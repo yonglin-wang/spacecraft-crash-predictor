@@ -33,11 +33,14 @@ class MARSDataLoader():
 
         # ensure time_gap has the right size
         if time_gap < (2 * window_size + time_ahead):
+            prev_gap = time_gap
             time_gap = 2 * window_size + time_ahead
+            if verbose:
+                print(f"Time gap of {prev_gap} too small--recalculated and set to {time_gap}")
 
         # ensure rolling step is not too small
         if rolling_step <= C.MIN_STEP:
-            raise ValueError("Rolling step {} is smaller than the minimal length {}".format(rolling_step, C.MIN_STEP))
+            raise ValueError(f"Rolling step {rolling_step} is smaller than the minimal length {C.MIN_STEP}")
 
         # record dataset info, all time in seconds
         self.window = window_size
@@ -56,10 +59,6 @@ class MARSDataLoader():
         self.data_dir = C.DATA_OUT_DIR_FORMAT.format(self.window_ms,
                                                      self.ahead_ms,
                                                      self.rolling_ms)
-        # record directory to save loader and models
-        # self.exp_dir = C.EXP_OUT_DIR_FORMAT.format(self.window_ms,
-        #                                            self.ahead_ms,
-        #                                            self.rolling_ms)
 
         # ensure all features in COL_PATH, and regenerate all features
         missing_feats = self.__missing_feature_files()

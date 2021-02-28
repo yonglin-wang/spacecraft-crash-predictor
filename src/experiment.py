@@ -348,7 +348,9 @@ def main():
     argparser.add_argument(
         '--rate', type=int, default=50, help='sampling rate used in window interpolation')
     argparser.add_argument(
-        '--gap', type=int, default=5, help='minimal time gap allowed between two crash events for data extraction')
+        '--gap', type=int, default=0, help='minimal time gap allowed between two crash events for data extraction. '
+                                           'Will be recalculated to be at least [2 * window_size + time_ahead].'
+                                           'Set to 0 to get auto calculation. ')
 
     # General training flags
     argparser.add_argument(
