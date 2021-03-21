@@ -32,9 +32,9 @@ class MARSDataLoader():
                  ):
 
         # ensure time_gap has the right size
-        if time_gap < (2 * window_size + time_ahead):
+        if time_gap < window_size + time_ahead:
             prev_gap = time_gap
-            time_gap = 2 * window_size + time_ahead
+            time_gap = window_size + time_ahead
             if verbose:
                 print(f"Time gap of {prev_gap} too small--recalculated and set to {time_gap}")
 
