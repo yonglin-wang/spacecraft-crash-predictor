@@ -25,7 +25,7 @@ class MARSDataLoader():
                  window_size=1.0,
                  time_ahead=0.5,
                  sampling_rate=50,
-                 time_gap=5,
+                 time_gap=0,
                  rolling_step=0.7,
                  verbose=True,
                  show_pbar=False
@@ -86,10 +86,12 @@ class MARSDataLoader():
                 self.__save_new_feature(extract_destabilize(self.basic_triples()), "destabilizing")
 
         # record sample size, assuming all columns have equal lengths (as they should)
-        labels = self.retrieve_col("label")
-        self.total_sample_size = int(labels.shape[0])
-        self.crash_sample_size = int(np.sum(labels==1))
-        self.noncrash_sample_size = int(np.sum(labels==0))
+
+        train_inds = self.retrieve_inds(get_train_split=True)
+        train_labels = self.retrieve_col("label")[train_inds]
+        self.total_sample_size = int(train_labels.shape[0])
+        self.crash_sample_size = int(np.sum(train_labels==1))
+        self.noncrash_sample_size = int(np.sum(train_labels==0))
 
     def __save_new_feature(self, generated_col: np.ndarray, col_name: str):
         """internal helper for validating and creating new feature and checking spelling"""
@@ -202,6 +204,20 @@ class MARSDataLoader():
 
         # return slicing
         return col_array[inds]
+
+    def retrieve_inds(self, get_train_split: bool):
+        """retrieve either train or test indices"""
+        if get_train_split:
+            col_path = self.data_file_path(C.INDS_PATH['train'])
+        else:
+            col_path = self.data_file_path(C.INDS_PATH['test'])
+
+        try:
+            return np.load(col_path)
+
+        except FileNotFoundError:
+            raise FileNotFoundError("Cannot find column array file {}".format(col_path))
+
 
 
 def generate_all_feat_df(loader:MARSDataLoader, config_id: int, inds: Union[list, np.ndarray]=None) -> pd.DataFrame:

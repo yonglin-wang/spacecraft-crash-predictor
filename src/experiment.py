@@ -80,6 +80,7 @@ def train(args: argparse.Namespace):
     best_test_inds = None
     best_y_preds = None
     best_model = None
+    best_norm_stat = None
     best_split_num = -1
     best_performance_metric = 0
     all_epochs = []
@@ -93,25 +94,23 @@ def train(args: argparse.Namespace):
             print(f"Now training split #{split_number + 1} out of total {args.cv_splits}...")
 
         # train split
-        train_hist, model, test_results, y_preds = train_one_split(args, loader,
-                                                          X_all, y_all,
-                                                          train_inds, test_inds,
-                                                          fit_ver, class_weight)
+        train_hist, model, val_results, y_preds, normalization_stats = train_one_split(args, loader,
+                                                                          X_all, y_all,
+                                                                          train_inds, test_inds,
+                                                                          fit_ver, class_weight)
         # append split results
         for metric_name in all_split_results:
-            all_split_results[metric_name].append(test_results[metric_name])
+            all_split_results[metric_name].append(val_results[metric_name])
 
         # record stats
         all_training_history.append(train_hist.history)
         all_epochs.append(len(train_hist.epoch))
 
         # compare results and save best performing set of objects for recording
-        if test_results[C.PERF_METRIC] > best_performance_metric:
-            best_performance_metric = test_results[C.PERF_METRIC]
-            best_test_inds = test_inds
-            best_y_preds = y_preds
-            best_model = model
-            best_split_num = split_number
+        if val_results[C.PERF_METRIC] > best_performance_metric:
+            best_performance_metric = val_results[C.PERF_METRIC]
+            best_test_inds, best_y_preds, best_model, best_split_num, best_norm_stat = \
+                test_inds, y_preds, model, split_number, normalization_stats
 
     # record experiment outputs
     assert best_split_num >= 0 \
@@ -124,6 +123,7 @@ def train(args: argparse.Namespace):
                                all_epochs,
                                best_split_num,
                                model=best_model,
+                               norm_stats=best_norm_stat,
                                train_history=all_training_history,
                                save_model=args.save_model)
 
@@ -140,7 +140,7 @@ def train_one_split(args: argparse.Namespace,
                     test_inds: np.ndarray,
                     fit_ver: int,
                     class_weight: dict
-                    ) -> Tuple[tf.keras.callbacks.History, tf.keras.Sequential, dict, np.ndarray]:
+                    ) -> Tuple[tf.keras.callbacks.History, tf.keras.Sequential, dict, np.ndarray, dict]:
     """function that trains a model and returns train history, the model, and test set results dictionary"""
     # get train and test data from indices
     X_train = X_all[train_inds]
@@ -149,9 +149,10 @@ def train_one_split(args: argparse.Namespace,
     y_test = y_all[test_inds]
 
     # normalize features if needed
+    norm_stats = None
     if args.normalize != C.NO_NORM:
         norm_feat_inds = find_col_inds_for_normalization(args.configID, args.normalize)
-        X_train, X_test = normalize_col(norm_feat_inds, X_train, X_test)
+        X_train, X_test, norm_stats = normalize_col(norm_feat_inds, X_train, X_test)
 
     if loader.verbose:
         # print split info
@@ -196,23 +197,27 @@ def train_one_split(args: argparse.Namespace,
     if not args.silent:
         print("Evaluation done, results: {}".format(eval_res))
 
-    return history, model, results, y_pred
+    return history, model, results, y_pred, norm_stats
 
 
 def normalize_col(col_inds: list,
                   train_data: np.ndarray,
                   test_data: np.ndarray,
-                  inplace=False) -> Tuple[np.ndarray, np.ndarray]:
+                  inplace=False) -> Tuple[np.ndarray, np.ndarray, dict]:
     assert train_data.ndim == 3 and test_data.ndim == 3, "train test arrays passed not 3D"
 
     if not inplace:
         train_data = train_data.copy()
         test_data = test_data.copy()
 
+    # save to {col_ind: {"mean": float, "std": float}}
+    norm_stats = dict()
     for col_ind in col_inds:
         # find mean and std using training set
         train_mean = np.mean(train_data[:, :, col_ind:col_ind + 1])
         train_std = np.std(train_data[:, :, col_ind:col_ind + 1])
+
+        norm_stats = {col_ind: {"mean": train_mean, "std": train_std}}
 
         # use mean and std to normalize both train and test data
         train_data[:, :, col_ind:col_ind + 1] = (train_data[:, :, col_ind:col_ind + 1] - train_mean) / train_std
@@ -222,7 +227,7 @@ def normalize_col(col_inds: list,
         assert np.isclose(np.std(train_data[:, :, col_ind:col_ind + 1]), 1) and \
                np.isclose(np.mean(train_data[:, :, col_ind:col_ind + 1]), 0)
 
-    return train_data, test_data
+    return train_data, test_data, norm_stats
 
 
 def find_col_inds_for_normalization(config_ID: int, mode: str) -> list:
@@ -260,6 +265,11 @@ def compute_test_results(y_pred, y_true, y_proba, eval_res):
 
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
 
+    try:
+        f1 = (2 * eval_res[C.PRECISION] * eval_res[C.RECALL])/(eval_res[C.PRECISION] + eval_res[C.RECALL])
+    except ZeroDivisionError:
+        f1 = np.nan
+
     output = {
                 "total": int(y_pred.shape[0]),
                 "tn": int(tn),
@@ -271,8 +281,14 @@ def compute_test_results(y_pred, y_true, y_proba, eval_res):
                 "recall": eval_res[C.RECALL],
                 "auc_tf": eval_res[C.AUC],
                 "auc_sklearn": roc_auc_score(y_true, y_proba),
-                "f1": (2 * eval_res[C.PRECISION] * eval_res[C.RECALL])/(eval_res[C.PRECISION] + eval_res[C.RECALL])
             }
+
+    try:
+        f1 = (2 * eval_res[C.PRECISION] * eval_res[C.RECALL])/(eval_res[C.PRECISION] + eval_res[C.RECALL])
+    except ZeroDivisionError:
+        f1 = np.nan
+
+    output["f1"] = f1
 
     # assert no difference between this and predefined output columns
     assert not set(output.keys()).difference(set(C.RES_COLS)), "output eval metrics don't match existing columns"
@@ -294,7 +310,7 @@ def print_training_info(args: argparse.Namespace):
     print("Note to this experiment: {}".format(args.notes))
 
     if args.cv_mode == C.NO_CV or args.cv_splits == 1:
-        print(f"No cross validation, using a default {C.TEST_SIZE} test size split.")
+        print(f"No cross validation, using a default {C.VAL_SIZE} test size split.")
     elif args.cv_mode == C.KFOLD:
         print(f"Currently training with {args.cv_splits}-fold cross validation.")
     elif args.cv_mode == C.LEAVE_OUT:
