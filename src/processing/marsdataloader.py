@@ -86,7 +86,6 @@ class MARSDataLoader():
                 self.__save_new_feature(extract_destabilize(self.basic_triples()), "destabilizing")
 
         # record sample size, assuming all columns have equal lengths (as they should)
-
         train_inds = self.retrieve_inds(get_train_split=True)
         train_labels = self.retrieve_col("label")[train_inds]
         self.total_sample_size = int(train_labels.shape[0])

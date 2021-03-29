@@ -15,13 +15,14 @@ RANDOM_SEED = 2020
 SEGMENT_COLS = ['seconds', 'trialPhase', 'peopleName', 'peopleTrialKey']
 ID = "id"
 OUTPUT_COLS = ["duration", "reading_num", "phase", "crash_ind", "subject", "trial_key"]
-SEGMENT_DICT_PATH = os.path.join("data", "segment_dict.pkl")
-SEGMENT_STATS_PATH = os.path.join("data", "segment_stats.csv")
+DATA_DIR = "data"
+SEGMENT_DICT_PATH = os.path.join(DATA_DIR, "segment_dict.pkl")
+SEGMENT_STATS_PATH = os.path.join(DATA_DIR, "segment_stats.csv")
 
 # -----
 # Feature extraction Constants
 # -----
-RAW_DATA_PATH = os.path.join("data", "data_all.csv")
+RAW_DATA_PATH = os.path.join(DATA_DIR, "data_all.csv")
 ESSENTIAL_RAW_COLS = ['seconds', 'trialPhase', 'currentPosRoll', 'currentVelRoll', 'calculated_vel', 'joystickX',
                       'peopleName', 'peopleTrialKey']
 
@@ -55,7 +56,7 @@ MIN_STEP = 0.04
 MIN_ENTRIES_IN_WINDOW = 2  # minimum # of entries between two crash events (i.e. in a window)
 
 # paths for saving output
-DEBUG_FORMAT = "debug_{}ahead_{}window.csv"
+DEBUG_FORMAT = "excluded_human_segments_debug_{}ahead_{}window.csv"
 
 # columns we will use for interpolation
 COLS_TO_INTERPOLATE = ('currentVelRoll', 'currentPosRoll', 'calculated_vel', 'joystickX')
@@ -69,7 +70,8 @@ CALCULATED = "calc"
 ORIGINAL = "orig"
 
 # paths for saving output
-DATA_OUT_DIR_FORMAT = "data/{}window_{}ahead_{}rolling/"
+DATA_OUT_DIR_FORMAT_BASE = "{}window_{}ahead_{}rolling"
+DATA_OUT_DIR_FORMAT = os.path.join(DATA_DIR, DATA_OUT_DIR_FORMAT_BASE)
 
 # path to pickle dataloader, saved under expriment
 LOADER_BASENAME = "dataloader.pkl"
@@ -125,9 +127,10 @@ CONV_MODE = {VAL_LOSS: "min",
 # list of available RNN models, all lower-cased
 LSTM = "lstm"
 GRU = "gru"
+LSTM_LSTM = "lstm-lstm"
 MLP = "mlp"
-AVAILABLE_MODELS = [LSTM, GRU]
-RNN_MODELS = [LSTM, GRU]
+AVAILABLE_MODELS = [LSTM, GRU, LSTM_LSTM]
+RNN_MODELS = [LSTM, GRU, LSTM_LSTM]
 
 # names for metrics
 AUC = "auc"
@@ -159,7 +162,7 @@ EXP_FORMAT = os.path.join(EXP_PATH, "exp{}_{}win_{}ahead_conf{}_{}")  # e.g.exp1
 RESULT_DIR = "results"
 
 # path for saving predictions
-PRED_PATH = os.path.join(RESULT_DIR, "TestSetPred_exp{}_{}win_{}ahead_conf{}_{}.csv")
+PRED_PATH = os.path.join(RESULT_DIR, "BestValPred_exp{}_{}win_{}ahead_conf{}_{}.csv")
 PRED_COL = "predicted"
 
 # path for normalization stats
@@ -218,3 +221,15 @@ SPLIT_MODES = [KFOLD, LEAVE_OUT, NO_CV]
 # Summary Constants
 # -----
 COMBINED_FILE_FORMAT = os.path.join(RESULT_DIR, "hpcc_results{}.csv")
+DATASET_STATS_FORMAT = os.path.join(RESULT_DIR, "dataset_stats{}.csv")
+DATASET_PATTERN = "^" + DATA_OUT_DIR_FORMAT_BASE.format(r"(\d+)", r"(\d+)", r"(\d+)")
+DEBUG_PATTERN = "^" + DEBUG_FORMAT.format(r"\d+", r"\d+")
+
+# -----
+# Prediction Constants
+# -----
+PRED_ID_COL = "prediction ID"
+PRED_ID_RECORD = os.path.join(RESULT_DIR, ".predIDs")
+PRED_RES_CSV_PATH = os.path.join(RESULT_DIR, "heldout_pred_res.csv")
+TEMPLATE_PRED_RES = os.path.join(RESULT_DIR, "template", "heldout_pred_res.csv")
+HELDOUT_PRED_PATH = os.path.join(RESULT_DIR, "heldoutPred_predID{}_{}win_{}trainahead_{}testahead.npz")

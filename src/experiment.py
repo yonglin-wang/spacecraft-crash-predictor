@@ -217,7 +217,8 @@ def normalize_col(col_inds: list,
         train_mean = np.mean(train_data[:, :, col_ind:col_ind + 1])
         train_std = np.std(train_data[:, :, col_ind:col_ind + 1])
 
-        norm_stats = {col_ind: {"mean": train_mean, "std": train_std}}
+        # record train set mean and std
+        norm_stats[col_ind] = {"mean": train_mean, "std": train_std}
 
         # use mean and std to normalize both train and test data
         train_data[:, :, col_ind:col_ind + 1] = (train_data[:, :, col_ind:col_ind + 1] - train_mean) / train_std
@@ -231,6 +232,7 @@ def normalize_col(col_inds: list,
 
 
 def find_col_inds_for_normalization(config_ID: int, mode: str) -> list:
+    """Return list of column indices that need to be normalized."""
     assert config_ID in C.CONFIG_SPECS, f"Cannot recognize configuration ID {config_ID}"
     assert mode in C.NORMALIZATION_MODES
 
@@ -438,7 +440,7 @@ def main():
     args = argparser.parse_args()
 
     if args.silent:
-        print("Currently in silent mode. Only Tensorflow progess will be printed.")
+        print("Currently in silent mode. Only TensorFlow progress will be printed.")
     else:
         print_training_info(args)
 

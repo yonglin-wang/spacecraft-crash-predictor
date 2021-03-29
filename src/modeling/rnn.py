@@ -23,17 +23,27 @@ def build_keras_rnn(sampling_rate, feature_num,
     if rnn_type == C.LSTM:
         model_out.add(
             keras.layers.LSTM(
-                units=rnn_out_dim,
+                rnn_out_dim,
                 input_shape=[sampling_rate, feature_num]
             )
         )
     elif rnn_type == C.GRU:
         model_out.add(
             keras.layers.GRU(
-                units=rnn_out_dim,
+                rnn_out_dim,
                 input_shape=[sampling_rate, feature_num]
             )
         )
+    elif rnn_type == C.LSTM_LSTM:
+        # tutorial found here: https://machinelearningmastery.com/stacked-long-short-term-memory-networks/
+        model_out.add(
+            keras.layers.LSTM(
+                rnn_out_dim,
+                return_sequences=True,
+                input_shape=[sampling_rate, feature_num]
+            )
+        )
+        model_out.add(keras.layers.LSTM(rnn_out_dim))
     else:
         raise NotImplementedError("RNN does not recognize {}".format(rnn_type))
 
@@ -47,10 +57,12 @@ def build_keras_rnn(sampling_rate, feature_num,
                  tf.keras.metrics.AUC(name=C.AUC),
                  tf.keras.metrics.Precision(name=C.PRECISION),
                  tf.keras.metrics.Recall(name=C.RECALL)]
-        # metrics=[tf.keras.metrics.AUC()]
     )
     return model_out
 
 
 if __name__ == "__main__":
-    model = build_keras_rnn(50, 3)
+    model = build_keras_rnn(50, 3, rnn_type="lstm-lstm")
+    inputs = tf.random.normal([32,50,3])
+    output = model(inputs)
+    print(output.shape)

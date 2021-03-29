@@ -233,7 +233,7 @@ def generate_feature_files(window_size: float,
     raw_data = raw_data[raw_data.trialPhase != 1]
 
     # load preprocessed segment metadata (will create if not exist)
-    meta_df, seg_dict = load_segment_data(C.RAW_DATA_PATH, C.SEGMENT_DICT_PATH, C.SEGMENT_STATS_PATH)
+    meta_df, seg_dict = load_segment_data(C.RAW_DATA_PATH, C.SEGMENT_DICT_PATH, C.SEGMENT_STATS_PATH, verbose=show_pbar)
 
     # clean metadata df, outputs only non-bug human segments for further selection
     meta_df = _clean_metadata(meta_df)
@@ -336,7 +336,7 @@ def generate_feature_files(window_size: float,
 
     # record excluded entries for analysis
     debug_base = C.DEBUG_FORMAT.format(int(time_ahead * 1000), int(window_size * 1000))
-    excluded_segments.to_csv(os.path.join(out_dir, "excluded_human_segments_" + debug_base), index=False)
+    excluded_segments.to_csv(os.path.join(out_dir, debug_base), index=False)
 
     # print processing results
     crash_total = feat_arrays["label"].count(1)
