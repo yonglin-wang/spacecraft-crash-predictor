@@ -52,5 +52,16 @@ def build_keras_rnn(sampling_rate, feature_num,
     return model_out
 
 
+# build many to many RNN with timedistributed: https://machinelearningmastery.com/timedistributed-layer-for-long-short-term-memory-networks-in-python/
+
+
 if __name__ == "__main__":
-    model = build_keras_rnn(50, 3)
+    model = Sequential()
+    model.add(keras.layers.LSTM(5, input_shape=(50,3), return_sequences=True))
+    model.add(keras.layers.TimeDistributed(keras.layers.Dense(1)))
+    model.compile(loss='mean_squared_error', optimizer='adam')
+
+    inputs = tf.random.normal([32,50,3])
+    output = model(inputs)
+    print(model.summary())
+    print(output.shape)
