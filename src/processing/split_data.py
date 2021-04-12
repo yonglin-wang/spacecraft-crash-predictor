@@ -25,7 +25,10 @@ class Splitter:
         self.mode = mode
 
         # create internal splitter for each mode
-        if n_splits > 1:
+        if self.mode == C.NO_CV or n_splits == 1:
+            # if no split, no splitter used
+            self.splitter = None
+        else:
             if self.mode == C.KFOLD:
                 # use stratified K to split data
                 self.splitter = StratifiedKFold(n_splits=self.n_splits, shuffle=True, random_state=C.RANDOM_SEED)
@@ -34,14 +37,12 @@ class Splitter:
                 self.splitter = KFold(n_splits=self.n_splits, shuffle=True, random_state=C.RANDOM_SEED)
             else:
                 raise NotImplementedError(f"{self.mode} not implemented!")
-        else:
-            # if no split, no splitter used
-            self.splitter = None
+
 
     def split_ind_generator(self,
                             y: np.ndarray,
                             subject_names: Union[List, np.ndarray]=None):
-        if self.n_splits == 1:
+        if self.n_splits == 1 or self.mode == C.NO_CV:
             return self.__no_iter(y)
 
         else:
