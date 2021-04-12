@@ -56,7 +56,8 @@ class Recorder():
 
 
         self.model_path = os.path.join(self.exp_dir, C.MODEL_PATH)  # path to model
-        self.recorder_path = os.path.join(self.exp_dir, C.REC_PATH)
+        self.recorder_path = os.path.join(self.exp_dir, C.REC_BASENAME)
+        self.norm_stats_path = os.path.join(self.exp_dir, C.NORM_STATS_PATH)
 
         # to be recorded on record_experiment
         self.history: dict = {}  # hisotry dict from keras history object, if any passed
@@ -74,6 +75,7 @@ class Recorder():
                           epoch_list: list,
                           best_split: int,
                           model: Sequential = None,
+                          norm_stats: dict = None,
                           train_history: list = None,
                           save_model: bool = False):
         """record experiment configuration and statistics"""
@@ -91,6 +93,9 @@ class Recorder():
 
         if model is not None and save_model:
             self.__save_model(model)
+
+        if norm_stats is not None:
+            self.__save_norm_stats(norm_stats)
 
         # append test set metrics to results/exp_results_all.csv
         self.__save_results(test_results)
@@ -136,13 +141,17 @@ class Recorder():
                 self.model_path))
         model.save(self.model_path)
 
+    def __save_norm_stats(self, norm_stats: dict):
+        """helper to save normalization stats"""
+        pickle.dump(norm_stats, open(self.norm_stats_path, "wb"))
+
     def __save_results(self, cv_results: Dict[str, list]) -> None:
         """calculate and append CV test results to results/exp_results_all.csv"""
         # compute mean and std of CV results
         calculated_results = {}
         for metric_name in cv_results:
-            calculated_results[metric_name + C.MEAN_SUFFIX] = np.mean(cv_results[metric_name])
-            calculated_results[metric_name + C.STD_SUFFIX] = np.std(cv_results[metric_name])
+            calculated_results[metric_name + C.MEAN_SUFFIX] = np.nanmean(cv_results[metric_name])
+            calculated_results[metric_name + C.STD_SUFFIX] = np.nanstd(cv_results[metric_name])
 
         # add ID to current results
         calculated_results[C.EXP_COL_CONV[C.EXP_ID_COL]] = self.exp_ID
@@ -201,7 +210,7 @@ class Recorder():
             "2nd & 3rd dimensions of input ({}) do not align with model input shape ({}).".format(str(model.input_shape[1:]),
                                                                                      str(X_input.shape[1:]))
 
-        return model.predict(X_input)
+        return model.generate_model_prediction(X_input)
 
 
 def _find_next_exp_ID() -> int:
@@ -227,11 +236,11 @@ def _filter_values(vars_dict: dict)->dict:
 
 if __name__ == "__main__":
     # for debugging only
-    train_dict = {'window': 2.0,
-                  'ahead': 1.0,
+    train_dict = {'window': 0.3,
+                  'ahead': 0.5,
                   'rolling': 0.7,
                   'rate': 50,
-                  'gap': 5,
+                  'gap': 0.8,
                   'configID': 1,
                   'cal_vel': False,
                   'early_stop': False,
@@ -244,7 +253,7 @@ if __name__ == "__main__":
                   'crash_ratio': 1,
                   'notes': 'n/a'}
 
-    loader = MARSDataLoader(window_size=2.0, time_ahead=1.0)
+    loader = MARSDataLoader(window_size=0.3, time_ahead=0.5)
     recorder = Recorder(loader, train_dict)
     print("recroder stats: ")
     print(vars(recorder))

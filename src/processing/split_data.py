@@ -55,7 +55,7 @@ class Splitter:
     def __no_iter(self, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """placeholder iterator that yields one split"""
         train_inds, test_inds = train_test_split(np.arange(y.shape[0]),
-                                                 test_size=C.TEST_SIZE,
+                                                 test_size=C.VAL_SIZE,
                                                  random_state=C.RANDOM_SEED)
         yield train_inds, test_inds
 
