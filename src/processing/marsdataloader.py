@@ -86,10 +86,12 @@ class MARSDataLoader():
                 self.__save_new_feature(extract_destabilize(self.basic_triples()), "destabilizing")
 
         # record sample size, assuming all columns have equal lengths (as they should)
-        labels = self.retrieve_col("label")
-        self.total_sample_size = int(labels.shape[0])
-        self.crash_sample_size = int(np.sum(labels==1))
-        self.noncrash_sample_size = int(np.sum(labels==0))
+
+        train_inds = self.retrieve_inds(get_train_split=True)
+        train_labels = self.retrieve_col("label")[train_inds]
+        self.total_sample_size = int(train_labels.shape[0])
+        self.crash_sample_size = int(np.sum(train_labels==1))
+        self.noncrash_sample_size = int(np.sum(train_labels==0))
 
     def __save_new_feature(self, generated_col: np.ndarray, col_name: str):
         """internal helper for validating and creating new feature and checking spelling"""

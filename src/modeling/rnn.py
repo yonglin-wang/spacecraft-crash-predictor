@@ -56,12 +56,4 @@ def build_keras_rnn(sampling_rate, feature_num,
 
 
 if __name__ == "__main__":
-    model = Sequential()
-    model.add(keras.layers.LSTM(5, input_shape=(50,3), return_sequences=True))
-    model.add(keras.layers.TimeDistributed(keras.layers.Dense(1)))
-    model.compile(loss='mean_squared_error', optimizer='adam')
-
-    inputs = tf.random.normal([32,50,3])
-    output = model(inputs)
-    print(model.summary())
-    print(output.shape)
+    model = build_keras_rnn(50, 3)

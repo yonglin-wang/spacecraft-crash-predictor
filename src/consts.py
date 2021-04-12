@@ -6,10 +6,20 @@ from collections import OrderedDict
 
 RANDOM_SEED = 2020
 
+
+# -----
+# Raw data segmentation constants
+# -----
+SEGMENT_COLS = ['seconds', 'trialPhase', 'peopleName', 'peopleTrialKey']
+ID = "id"
+OUTPUT_COLS = ["duration", "reading_num", "phase", "crash_ind", "subject", "trial_key"]
+SEGMENT_DICT_PATH = os.path.join("data", "segment_dict.pkl")
+SEGMENT_STATS_PATH = os.path.join("data", "segment_stats.csv")
+
 # -----
 # Feature extraction Constants
 # -----
-RAW_DATA_PATH = "data/data_all.csv"
+RAW_DATA_PATH = os.path.join("data", "data_all.csv")
 ESSENTIAL_RAW_COLS = ['seconds', 'trialPhase', 'currentPosRoll', 'currentVelRoll', 'calculated_vel', 'joystickX',
                       'peopleName', 'peopleTrialKey']
 

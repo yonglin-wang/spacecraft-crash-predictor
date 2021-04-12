@@ -214,6 +214,8 @@ def normalize_col(col_inds: list,
         train_mean = np.mean(train_data[:, :, col_ind:col_ind + 1])
         train_std = np.std(train_data[:, :, col_ind:col_ind + 1])
 
+        norm_stats = {col_ind: {"mean": train_mean, "std": train_std}}
+
         # use mean and std to normalize both train and test data
         train_data[:, :, col_ind:col_ind + 1] = (train_data[:, :, col_ind:col_ind + 1] - train_mean) / train_std
         test_data[:, :, col_ind:col_ind + 1] = (test_data[:, :, col_ind:col_ind + 1] - train_mean) / train_std

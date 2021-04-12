@@ -235,8 +235,11 @@ def generate_feature_files(window_size: float,
     # filter out non-human controls in data
     raw_data = raw_data[raw_data.trialPhase != 1]
 
-    # get unique peopleTrialKeys that have crashes for skipping no-crash trials
-    crash_keys_all = set(raw_data[raw_data.trialPhase == 4].peopleTrialKey.unique())
+    # load preprocessed segment metadata (will create if not exist)
+    meta_df, seg_dict = load_segment_data(C.RAW_DATA_PATH, C.SEGMENT_DICT_PATH, C.SEGMENT_STATS_PATH)
+
+    # clean metadata df, outputs only non-bug human segments for further selection
+    meta_df = _clean_metadata(meta_df)
 
     # #### initialize auxiliary objects for debugging
     # record crash events that are not too short from the previous crash
@@ -356,12 +359,7 @@ def generate_feature_files(window_size: float,
 
     # record excluded entries for analysis
     debug_base = C.DEBUG_FORMAT.format(int(time_ahead * 1000), int(window_size * 1000))
-    excluded_crashes_too_close.to_csv(os.path.join(out_dir, "too_close_to_last_" + debug_base), index=False)
-    excluded_crashes_too_few.to_csv(os.path.join(out_dir, "too_few_between_" + debug_base), index=False)
-    all_valid_crashes.to_csv(os.path.join(out_dir, "all_valid_crashes_" + debug_base), index=False)
-
-    crash_total = label_list.count(1)
-    noncrash_total = label_list.count(0)
+    excluded_segments.to_csv(os.path.join(out_dir, "excluded_human_segments_" + debug_base), index=False)
 
     print("Total crash samples: {}\n"
           "Total noncrash samples: {}\n"
