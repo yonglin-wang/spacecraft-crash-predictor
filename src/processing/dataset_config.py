@@ -15,12 +15,12 @@ from processing.extract_features import broadcast_to_sampled
 import consts as C
 
 
-def load_dataset(loader: MARSDataLoader, config_id: int, test_split=False) -> Tuple[np.ndarray, np.ndarray]:
+def load_dataset(loader: MARSDataLoader, config_id: int) -> Tuple[np.ndarray, np.ndarray]:
     """
     load X matrix and y matrix with given config number.
     :param loader: loader to retrieve columns from
     :param config_id: ID for configuration to use
-    :return: X and y, from train or test split
+    :return: X_all, y_all
     """
     # ### Load features and labels in specified configuration ID
     # load config function (maybe partially filled)
@@ -36,14 +36,7 @@ def load_dataset(loader: MARSDataLoader, config_id: int, test_split=False) -> Tu
     else:
         raise ValueError("Cannot recognize config_num: {}".format(config_id))
 
-    X_all, y_all = config(loader)
-
-    if test_split:
-        inds = loader.retrieve_inds(get_train_split=False)
-    else:
-        inds = loader.retrieve_inds(get_train_split=True)
-
-    return X_all[inds], y_all[inds]
+    return config(loader)
 
 
 
@@ -80,5 +73,5 @@ def _generate_config_3(loader: MARSDataLoader) -> Tuple[np.ndarray, np.ndarray]:
 
 
 if __name__ == "__main__":
-    loader = MARSDataLoader(window_size=0.3, time_ahead=0.5, rolling_step=0.7, verbose=True)
+    loader = MARSDataLoader(window_size=2.0, time_ahead=1.0, rolling_step=0.7, verbose=True)
     X_all, y_all = load_dataset(loader, 3)

@@ -1,1 +1,0 @@
-prediction ID,experiment ID,window,train ahead,pred ahead,rolling,gap,config id,auc_tf,auc_sklearn,precision,recall,accuracy,f1,tn,fp,fn,tp,total,crash_size,noncrash_size
