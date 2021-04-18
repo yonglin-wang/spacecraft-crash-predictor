@@ -15,7 +15,10 @@ from processing.extract_features import broadcast_to_sampled
 import consts as C
 
 
-def load_dataset(loader: MARSDataLoader, config_id: int, test_split=False) -> Tuple[np.ndarray, np.ndarray]:
+def load_dataset(loader: MARSDataLoader,
+                 config_id: int,
+                 test_split=False,
+                 seq_label=False) -> Tuple[np.ndarray, np.ndarray]:
     """
     load X matrix and y matrix with given config number.
     :param loader: loader to retrieve columns from
@@ -36,11 +39,18 @@ def load_dataset(loader: MARSDataLoader, config_id: int, test_split=False) -> Tu
     else:
         raise ValueError("Cannot recognize config_num: {}".format(config_id))
 
-    X_all, y_all = config(loader)
+    X_all = config(loader)
+
+    if seq_label:
+        y_all = loader.retrieve_col("seq_label").reshape((-1, loader.sampling_rate, 1))
+    else:
+        y_all = loader.retrieve_col("label").reshape(-1, 1)
 
     if test_split:
+        # if specified, return only the data for held out test
         inds = loader.retrieve_inds(get_train_split=False)
     else:
+        # otherwise, return data for CV
         inds = loader.retrieve_inds(get_train_split=True)
 
     return X_all[inds], y_all[inds]
@@ -48,37 +58,36 @@ def load_dataset(loader: MARSDataLoader, config_id: int, test_split=False) -> Tu
 
 
 def _generate_config_1_2(loader: MARSDataLoader,
-                         vel_mode:str) -> Tuple[np.ndarray, np.ndarray]:
+                         vel_mode:str,
+                         ) -> np.ndarray:
     """
-    generates and saves X y after train-test split.
+    retrieves feature matrix for config 1 and 2.
     features used: velocity, position, joystick
     :param loader: DataLoader to generate features from
-    :return: X_all, y_all
+    :return: X_all
     """
 
     # ### load data needed
     X_all = loader.basic_triples(vel_mode=vel_mode)
-    y_all = loader.retrieve_col("label").reshape(-1, 1)
 
-    # return x and y
-    return X_all, y_all
+    # return x
+    return X_all
 
 
-def _generate_config_3(loader: MARSDataLoader) -> Tuple[np.ndarray, np.ndarray]:
+def _generate_config_3(loader: MARSDataLoader) -> np.ndarray:
     """
-    generates and saves X y after train-test split.
+    retrieves feature matrix for config 1 and 2.
     features used: original velocity, position, joystick, destabilizing
     :param loader: DataLoader to generate features from
-    :return: X_all, y_all
+    :return: X_all
     """
 
     # load data
     X_all = np.dstack([loader.basic_triples(), loader.retrieve_col("destabilizing")])
-    y_all = loader.retrieve_col("label").reshape(-1, 1)
 
-    return X_all, y_all
+    return X_all
 
 
 if __name__ == "__main__":
-    loader = MARSDataLoader(window_size=0.3, time_ahead=0.5, rolling_step=0.7, verbose=True)
-    X_all, y_all = load_dataset(loader, 3)
+    loader = MARSDataLoader(window_size=0.3, time_ahead=0.3, rolling_step=0.1, verbose=True, show_pbar=True)
+    X_all, y_all = load_dataset(loader, 3, seq_label=True)

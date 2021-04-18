@@ -28,15 +28,14 @@ np.random.seed(C.RANDOM_SEED)
 random.seed(C.RANDOM_SEED)
 
 
-def _extract_sliding_windows(interval_series: pd.Series, window_size: float, rolling_step: float, avoid_duplicate=False) -> list:
+def _extract_sliding_windows(interval_series: pd.Series, window_size: float, rolling_step: float) -> list:
     """
     Identify extractable valid window boundaries (inclusive) in given slice of the seconds column.
-    Valid window is defined as window that contains and only contains more than 1 non-crash events.
+    1st window aligns with interval start, while last is last one possible before window end exceeds interval end.
     :authors: Jie Tang, Yonglin Wang
     :param interval_series: series of time points between 2 crash events
     :param window_size: time scale length of data used for prediction in seconds, i.e. size of window
     :param rolling_step: length of rolling step in seconds
-    :param avoid_duplicate: whether to check for duplicate windows before appending (time consuming)
     :return: tuples of valid start and end of valid windows, in seconds
     """
     # precondition: rolling step must be larger than this to avoid duplicate windows
@@ -93,6 +92,8 @@ def interpolate_entries(entries,
     # record interpolation result for each column. Each value entry has shape (50, )
     output = {col_name: sp.interpolate.interp1d(x, entries[col_name], kind='linear')(x_sample)
               for col_name in cols_to_interpolate}
+
+    output["seconds"] = x_sample
 
     return output
 
@@ -161,19 +162,47 @@ def _clean_metadata(meta_df: pd.DataFrame) -> pd.DataFrame:
     return meta_df.drop(meta_df[meta_df.index.isin(set(buggy_human_segs))].index)
 
 
-def _process_window(output_arrays: dict, entries_for_inter, trial_key: str, label: int, sampling_rate: int):
-    """helper function to interpolate entries in a window and record output"""
+def _process_window(output_arrays: dict, entries_for_inter, trial_key: str, crash_cutoff: Union[float, np.float], sampling_rate: int) -> None:
+    """
+    helper function to interpolate entries in a window and record output
+    :param output_arrays:
+    :param entries_for_inter:
+    :param trial_key:
+    :param crash_cutoff: cutoff time in seconds, time steps beyond which has the a corresponding seq label of 1
+    :param sampling_rate:
+    :return:
+    """
+
     int_results = interpolate_entries(entries_for_inter, sampling_rate=sampling_rate)
 
+    # record features
     output_arrays["vel_ori"].append(int_results["currentVelRoll"])
     output_arrays["vel_cal"].append(int_results["calculated_vel"])
     output_arrays["position"].append(int_results["currentPosRoll"])
     output_arrays["joystick"].append(int_results["joystickX"])
-    output_arrays["label"].append(label)
     output_arrays["trial_key"].append(trial_key)
     output_arrays["person"].append(entries_for_inter["peopleName"].iloc[0])
     output_arrays["start_sec"].append(entries_for_inter['seconds'].iloc[0])
-    output_arrays["end_sec"].append(entries_for_inter['seconds'].iloc[-1])
+    window_end = entries_for_inter['seconds'].iloc[-1]
+    output_arrays["end_sec"].append(window_end)
+
+    # record labels TODO end_sec 和crash cutoff应该差不太多，尤其是靠后的Segments
+    seq_labels = np.zeros(sampling_rate)
+    single_label = 0
+    if window_end >= crash_cutoff:
+        # If window touches or crosses cutoff, there is at least one time step that has label 1.
+        # First, retrieve interpolated seconds for locating cutoff.
+        seconds = int_results["seconds"]
+        # Then, any time step that touches or crosses cutoff receives a label of 1
+        assert seq_labels.shape[0] == seconds.shape[0], "Length mismatch between interpolated sequence length and seconds"
+        seq_labels[seconds >= crash_cutoff] = 1
+        assert np.sum(seq_labels) > 0, "no 1 labels assigned!"
+        # lastly, set single label to 1 to signal that there is a crash within time ahead
+        single_label = 1
+
+    # now, record both single and seq label
+    output_arrays["label"].append(single_label)
+    output_arrays["seq_label"].append(seq_labels)
 
 
 def generate_feature_files(window_size: float,
@@ -217,13 +246,17 @@ def generate_feature_files(window_size: float,
 
     assert time_gap >= window_size + time_ahead, "Gap too short"
 
+    assert time_ahead > time_step, f"Lookahead time {time_ahead} should be larger than rolling step {time_step}; " \
+                                   f"otherwise some crashed segments may not have crashed windows."
+
     # ensure output folder exists
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
     # #### output and helper functions
     # dict of nested lists to convert to np for save, each of length n_samples
-    feat_arrays = {k: [] for k in ("vel_ori", "vel_cal", "position", "joystick", "label", "trial_key", "person", "start_sec", "end_sec")}
+    feat_arrays = {k: [] for k in ("vel_ori", "vel_cal", "position", "joystick",
+                                   "label", "trial_key", "person", "start_sec", "end_sec", "seq_label")}
 
     # #### load and prepare raw data
     # extract all needed columns
@@ -260,7 +293,6 @@ def generate_feature_files(window_size: float,
     # ### create index dictionary for faster retrieval later from raw data
     # 1. dict of {<trial key>: [crash segment ids]}. containing valid crashed segments in each trial
     # 2. dict of {<trial key>: [non-crash segment ids]}. containing valid non-crash segments in each trial
-
     valid_crashed_ids, valid_non_crashed_ids = dict(), dict()
     for trial_key, segments in meta_df.groupby("trial_key"):
         valid_crashed_ids[trial_key] = segments[segments.crash_ind != -1].index.tolist()
@@ -268,64 +300,41 @@ def generate_feature_files(window_size: float,
 
     # #### iterate through trials to process extract features
     with tqdm(total=raw_data.peopleTrialKey.nunique(), disable=not show_pbar) as pbar:
-        # TODO 补上
-        #  1. seq label paths in Consts,
-        #  2. 窗口在整个human seg从start滑到(window start在)crash - ahead - window都是全0, (50, 1)的0 vector
-        #     > 同时，每个窗口对应的Scalar label是0
-        #  3. seg的crash - ahead - window到(window start在)crash-window中：
-        #  interpolated后时间（interpolate(win_start, win_start+window)），以crash-ahead为分界时间点（numpy找时间点的位置？），
-        #  此时间点之前的部分是0，等于及大于的部分是1
-        #     > 同时，每个窗口对应的Scalar label是1
-        #  4. 记得存。。
-        #  5. load的时候也要选到底要什么shape
-        #  6. split也要记得带上
-        #  7. seq y的accuracy metric也要改一下
-        #  8. output file也要改一下format
-        # ### (1/2) Extract all-0 windows
-
-
-        # TODO 删掉底下的
         # extract crash events features from each trial
         for current_trial_key, trial_raw_data in raw_data.groupby("peopleTrialKey"):
-            # for trial key, for each crashed segment in this trial (if any), record crash and non crash
-            for crashed_id in valid_crashed_ids[current_trial_key]:
-                # 1. find corresponding window of the crash and interpolate.
-                # extract entries within crash window
-                crash_time = trial_raw_data.loc[seg_dict[crashed_id]["crash_ind"]].seconds
-                crash_window_df = trial_raw_data[trial_raw_data.seconds.between(
-                    crash_time - window_size - time_ahead, crash_time - time_ahead)]
-                _process_window(feat_arrays, crash_window_df, current_trial_key, 1, sampling_rate)
-                # 2. generate sliding windows of the segment as noncrash samples and interpolate.
-                seg_df = trial_raw_data.loc[seg_dict[crashed_id]["indices"]]
-                # calculate sliding window bounds; left: start of segment, right: right before the time-ahead range
-                left_bound = seg_dict[crashed_id]["start_sec"]
-                right_bound = crash_time - time_step
+            # for trial key, for each crashed segment in this trial (if any), record crash and non crash windows
+            if current_trial_key in valid_crashed_ids:
+                for crashed_id in valid_crashed_ids[current_trial_key]:
+                    # time point of crash
+                    crash_time = trial_raw_data.loc[seg_dict[crashed_id]["crash_ind"]].seconds
+                    # cut off time, time steps on or right of this time receives label 1; else 0
+                    crash_cutoff = crash_time - time_ahead
 
-                # extract and record sliding windows
-                window_bounds = _extract_sliding_windows(seg_df[seg_df.seconds.between(left_bound, right_bound)].seconds,
-                                                         window_size, time_step)
-                # process each window
-                for win_start, win_end in window_bounds:
-                    # restore all window entries, bounds inclusive by default
-                    entries_in_win = seg_df[seg_df.seconds.between(win_start, win_end)]
-                    # resample & interpolate
-                    _process_window(feat_arrays, entries_in_win, current_trial_key, 0, sampling_rate)
+                    # extract windows boundaries
+                    seg_df = trial_raw_data.loc[seg_dict[crashed_id]["indices"]]
+                    seg_windows = _extract_sliding_windows(seg_df.seconds, window_size, time_step)
+
+                    # process each window
+                    for win_start, win_end in seg_windows:
+                        # restore all window entries, bounds inclusive by default
+                        entries_in_win = seg_df[seg_df.seconds.between(win_start, win_end)]
+                        # interpolate the window; feature array will be updated in place
+                        _process_window(feat_arrays, entries_in_win, current_trial_key, crash_cutoff, sampling_rate)
 
             # for the non-crashed segment in this trial (if any), do sliding window and interpolate non crash data
-            for non_crashed_id in valid_non_crashed_ids[current_trial_key]:
-                seg_df = trial_raw_data.loc[seg_dict[non_crashed_id]["indices"]]
-                # get sliding window bounds
-                left_bound = seg_dict[non_crashed_id]["start_sec"]
-                right_bound = seg_dict[non_crashed_id]["end_sec"]
-                # extract and record sliding windows
-                window_bounds = _extract_sliding_windows(seg_df[seg_df.seconds.between(left_bound, right_bound)].seconds,
-                                                         window_size, time_step)
-                # process each window
-                for win_start, win_end in window_bounds:
-                    # restore all window entries, bounds inclusive by default
-                    entries_in_win = seg_df[seg_df.seconds.between(win_start, win_end)]
-                    # resample & interpolate
-                    _process_window(feat_arrays, entries_in_win, current_trial_key, 0, sampling_rate)
+            if current_trial_key in valid_non_crashed_ids:
+                for non_crashed_id in valid_non_crashed_ids[current_trial_key]:
+                    # get entries of this segment
+                    seg_df = trial_raw_data.loc[seg_dict[non_crashed_id]["indices"]]
+                    # extract and record sliding windows
+                    seg_windows = _extract_sliding_windows(seg_df.seconds, window_size, time_step)
+                    # process each window
+                    for win_start, win_end in seg_windows:
+                        # restore all window entries, bounds inclusive by default
+                        entries_in_win = seg_df[seg_df.seconds.between(win_start, win_end)]
+                        # interpolate and process window; cutoff of inf -> labels all 0;
+                        # feature array will be updated in place
+                        _process_window(feat_arrays, entries_in_win, current_trial_key, np.inf, sampling_rate)
 
             pbar.update(1)
 
@@ -348,7 +357,8 @@ def generate_feature_files(window_size: float,
                              (feat_arrays["person"], "person"),
                              (feat_arrays["trial_key"], "trial_key"),
                              (feat_arrays["start_sec"], "start_seconds"),
-                             (feat_arrays["end_sec"], "end_seconds")]]
+                             (feat_arrays["end_sec"], "end_seconds"),
+                             (feat_arrays["seq_label"], "seq_label")]]
     print("Done!\n")
 
     # record excluded entries for analysis
@@ -394,4 +404,5 @@ def broadcast_to_sampled(arr: np.ndarray, arr_sampled: np.ndarray) -> np.ndarray
 
 
 if __name__ == "__main__":
-    exp_len = generate_feature_files(0.3, 0.5, 50, 0.8, 0.7, "data/300window_500ahead_700rolling", show_pbar=True)
+    # TODO why 2000 below ends up with "KeyError: '1_as_P31/01_600back_Block1_trial_001.csv'"???
+    exp_len = generate_feature_files(2.0, 1.0, 50, 3.0, 0.1, "data/2000window_1000ahead_100rolling", show_pbar=True)

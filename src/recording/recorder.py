@@ -28,6 +28,7 @@ class Recorder():
     def __init__(self,
                  loader: MARSDataLoader,
                  train_args: dict,
+                 seq_y: bool,
                  verbose=True):
 
         self.loader = loader
@@ -35,8 +36,9 @@ class Recorder():
         self.train_args = train_args
         self.configID = self.train_args["configID"]
         self.exp_date = date.today().strftime("%B %d, %Y")
+        self.using_seq_label = seq_y
 
-        # get unique experiment ID
+        # get unique experiment ID for current project folder
         self.exp_ID = int(_find_next_exp_ID())
 
         # unique experiment folder path
@@ -116,8 +118,13 @@ class Recorder():
         test_df = generate_all_feat_df(self.loader, self.configID, inds=test_inds)
         test_df[C.PRED_COL] = y_pred
 
-        # reorder so that false negatives come up first
-        test_df.sort_values(["label", C.PRED_COL], ascending=[False, True], inplace=True)
+        if self.using_seq_label:
+            # compare seq predictions by row
+            test_df["seq_matched"] = test_df.apply(lambda row: np.array_equal(row.seq_label, row[C.PRED_COL]), axis=1)
+            test_df.sort_values("seq_matched", inplace=True)
+        else:
+            # reorder so that false negatives come up first
+            test_df.sort_values(["label", C.PRED_COL], ascending=[False, True], inplace=True)
 
         # save prediction file
         test_df.to_csv(self.pred_path, index=False)
@@ -199,18 +206,18 @@ class Recorder():
 
         return output
 
-    def predict_with_model(self, X_input: np.ndarray) -> np.ndarray:
-        """return y probabilities given data with model saved at model_path"""
-        assert os.path.exists(self.model_path), "No model saved at {}".format(self.model_path)
-
-        model = load_model(self.model_path)
-
-        # compare only non sample size shapes
-        assert model.input_shape[1:] == X_input.shape[1:], \
-            "2nd & 3rd dimensions of input ({}) do not align with model input shape ({}).".format(str(model.input_shape[1:]),
-                                                                                     str(X_input.shape[1:]))
-
-        return model.generate_model_prediction(X_input)
+    # def predict_with_model(self, X_input: np.ndarray) -> np.ndarray:
+    #     """return y probabilities given data with model saved at model_path"""
+    #     assert os.path.exists(self.model_path), "No model saved at {}".format(self.model_path)
+    #
+    #     model = load_model(self.model_path)
+    #
+    #     # compare only non sample size shapes
+    #     assert model.input_shape[1:] == X_input.shape[1:], \
+    #         "2nd & 3rd dimensions of input ({}) do not align with model input shape ({}).".format(str(model.input_shape[1:]),
+    #                                                                                  str(X_input.shape[1:]))
+    #
+    #     return model.generate_model_prediction(X_input)
 
 
 def _find_next_exp_ID() -> int:
@@ -231,7 +238,11 @@ def _find_next_exp_ID() -> int:
 
 def _filter_values(vars_dict: dict)->dict:
     """helper function to filter out dictionary entries whose values are not str, num or bool"""
-    return {key: value for key, value in vars_dict.items() if type(value) in C.ACCEPTABLE_TYPES}
+    output = {key: value for key, value in vars_dict.items() if type(value) in C.ACCEPTABLE_TYPES}
+    # ad-hoc popping duplicate keys
+    output.pop("seq_label")     # same as using_seq_label in Recorder
+
+    return output
 
 
 if __name__ == "__main__":

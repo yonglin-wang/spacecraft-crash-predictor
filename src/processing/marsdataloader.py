@@ -18,7 +18,8 @@ import consts as C
 class MARSDataLoader():
     """
     Lightweight loader class that extracts, saves, and loads features upon initialization, saves only links to files.
-    Pickling not recommended; instead, create a new MARSDataLoader in every script and just keep input consistent.
+    Records only the essential attributes to load a dataset; other experiment specific parameters should be saved in
+    recording.Recorder.
     """
 
     def __init__(self,
@@ -162,7 +163,7 @@ class MARSDataLoader():
 
     def retrieve_col(self, col_name: Union[str, list]) -> np.ndarray:
         """
-        retrieve column with specified name. Must be one of keys in COL_PATHS.
+        load np array with specified name. Must be one of keys in COL_PATHS.
         :param col_name: name or names of the column to return
         :return: column of shape (n, ) or (n, sampling_rate) or (n, sampling_rate, n_features)
         """
@@ -254,5 +255,5 @@ def __rename_used_cols(df, train_cols: list):
 
 if __name__ == "__main__":
     from processing.dataset_config import load_dataset
-    loader = MARSDataLoader(window_size=2.0, time_ahead=1.0, rolling_step=0.7, verbose=True)
+    loader = MARSDataLoader(window_size=0.3, time_ahead=0.5, rolling_step=0.1, verbose=True)
 
