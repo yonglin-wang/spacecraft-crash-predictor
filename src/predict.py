@@ -54,7 +54,7 @@ def get_datasets(loader: MARSDataLoader,
                  norm_stats_path: str=None) -> Tuple[np.ndarray, np.ndarray]:
     """load test X and y, normalized if specified"""
     # Load original test set X and y
-    X, y = load_dataset(loader, config_id, test_split=True, seq_label=seq_label)
+    X, y, _ = load_dataset(loader, config_id, test_split=True, seq_label=seq_label)
 
     # get cols normalized, if specified
     if normalize_mode != C.NO_NORM:
@@ -182,13 +182,16 @@ def run_prediction(args: argparse.Namespace):
                                                 exp_loader.time_gap, exp_loader.rolling,
                                                 verbose=verbose, show_pbar=verbose)
 
-    # get normalization recorder TODO seq labels!!
+    # get normalization recorder
+    print(f"Predicting with data from test set from {current_dataset_loader.data_dir}...")
     X_test, y_test = get_datasets(current_dataset_loader,
                                   exp_recorder.train_args["normalize"],
                                   exp_recorder.configID,
                                   seq_label=exp_recorder.using_seq_label,
                                   norm_stats_path=exp_recorder.norm_stats_path)
 
+
+    print(f"Predicting with model from {exp_recorder.model_path}...")
     model = _load_model(exp_recorder.model_path)
 
     # get results

@@ -55,13 +55,15 @@ def train(args: argparse.Namespace):
         fit_ver = 2  # only one line per epoch in output file
 
     # load dataset with loader object
-    X_all, y_all = load_dataset(loader, args.configID, seq_label=recorder.using_seq_label)
+    X_all, y_all, epi_ids_all = load_dataset(loader, args.configID, seq_label=recorder.using_seq_label)
+    assert len(X_all) == len(y_all) == len(epi_ids_all), \
+        "Length mismatch. X: {}, y: {}, Episode ids: {}".format(X_all.shape, y_all.shape, epi_ids_all.shape)
 
     # get generator for splitting
     if args.cv_mode == C.NO_CV:
         # ensure split # is 1 when no CV
         args.cv_splits = 1
-    splitter = Splitter(args.cv_mode, args.cv_splits, verbose=loader.verbose)
+    splitter = Splitter(args.cv_mode, args.cv_splits, epi_ids_all, verbose=loader.verbose)
     if args.cv_mode == C.NO_CV or args.cv_mode == C.KFOLD:
         split_gen = splitter.split_ind_generator(y_all)
     elif args.cv_mode == C.LEAVE_OUT:

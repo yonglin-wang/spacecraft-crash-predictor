@@ -15,13 +15,13 @@ from scipy.interpolate import interp1d
 from sklearn.model_selection import StratifiedShuffleSplit
 
 from tqdm import tqdm
-
-import argparse
 import random
 
+from processing.split_data import _save_test_train_split
 from utils import calculate_exec_time
 import consts as C
-from processing.segment_raw_readings import load_segment_data
+from processing.episode_raw_readings import load_episode_data
+from recording.log import init_logger
 
 # control for randomness in case of any
 np.random.seed(C.RANDOM_SEED)
@@ -146,23 +146,15 @@ def extract_destabilize(feature_matrix: np.ndarray) -> np.ndarray:
     same_sign = np.equal(signs, signs[:, :, 0:1])
 
     # sum up booleans, only destabilizing when all 3 columns in a row are true (i.e. row sums to 3)
-    # return shape: (sample_size, sampling_rate)
     num_feats = feature_matrix.shape[2]
+
+    # return shape: (sample_size, sampling_rate)
     return np.equal(same_sign.sum(axis=2), num_feats)
 
 
-def _clean_metadata(meta_df: pd.DataFrame) -> pd.DataFrame:
-    """remove buggy data entry from the given segment metadata df, return the debugged df"""
-    # remove human control segments
-    meta_df = meta_df[meta_df.phase == 3]
-    # locate buggy indices. current condition: 1-reading human segments and their corresponding crashes
-    buggy_human_segs = meta_df[meta_df.reading_num <= C.MIN_ENTRIES_IN_WINDOW].index
-    assert len(buggy_human_segs) == 16
-
-    return meta_df.drop(meta_df[meta_df.index.isin(set(buggy_human_segs))].index)
-
-
-def _process_window(output_arrays: dict, entries_for_inter, trial_key: str, crash_cutoff: Union[float, np.float], sampling_rate: int) -> None:
+def _process_window(output_arrays: dict, entries_for_inter, trial_key: str,
+                    crash_cutoff: Union[float, np.float], sampling_rate: int,
+                    episode_id: int) -> None:
     """
     helper function to interpolate entries in a window and record output
     :param output_arrays:
@@ -185,8 +177,9 @@ def _process_window(output_arrays: dict, entries_for_inter, trial_key: str, cras
     output_arrays["start_sec"].append(entries_for_inter['seconds'].iloc[0])
     window_end = entries_for_inter['seconds'].iloc[-1]
     output_arrays["end_sec"].append(window_end)
+    output_arrays["episode_id"].append(episode_id)
 
-    # record labels TODO end_sec 和crash cutoff应该差不太多，尤其是靠后的Segments
+    # record labels
     seq_labels = np.zeros(sampling_rate)
     single_label = 0
     if window_end >= crash_cutoff:
@@ -213,8 +206,8 @@ def generate_feature_files(window_size: float,
                            out_dir: str,
                            show_pbar=False) -> int:
     """
-    Extract basic features columns from raw data and saving them to disk
-    :author: Yonglin Wang, Jie Tang
+    Extract basic features columns from raw data and saving them to disk; main function of this script
+    :author: Yonglin Wang
     :param window_size: time length of data used for training, in seconds
     :param time_ahead: time in advance to predict, in seconds
     :param sampling_rate: sampling rate in each window
@@ -223,6 +216,13 @@ def generate_feature_files(window_size: float,
     :param out_dir: output directory to save all features to
     :return: total number of samples generated
     """
+    # ensure output folder exists
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+
+    # get logger to log information
+    logger = init_logger(__name__, out_dir, C.EXTRACT_LOG_NAME)
+
     # ensure raw data file exists
     if not os.path.exists(C.RAW_DATA_PATH):
         raise FileNotFoundError("Raw data file cannot be found at {}".format(C.RAW_DATA_PATH))
@@ -231,7 +231,7 @@ def generate_feature_files(window_size: float,
     begin = time.time()
 
     # print training stats
-    print("Feature generation settings: \n"
+    logger.info("Feature generation settings: \n"
           "Window size: {}s\n"
           "Time ahead: {}s\n"
           "Sampling rate: {}\n"
@@ -247,16 +247,13 @@ def generate_feature_files(window_size: float,
     assert time_gap >= window_size + time_ahead, "Gap too short"
 
     assert time_ahead > time_step, f"Lookahead time {time_ahead} should be larger than rolling step {time_step}; " \
-                                   f"otherwise some crashed segments may not have crashed windows."
-
-    # ensure output folder exists
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
+                                   f"otherwise some crashed episodes may not have crashed windows."
 
     # #### output and helper functions
-    # dict of nested lists to convert to np for save, each of length n_samples
+    # dict of int lists to convert to np for save, each of length n_samples;
+    # not including later inferred features here (e.g. destab)
     feat_arrays = {k: [] for k in ("vel_ori", "vel_cal", "position", "joystick",
-                                   "label", "trial_key", "person", "start_sec", "end_sec", "seq_label")}
+                                   "label", "trial_key", "person", "start_sec", "end_sec", "seq_label", "episode_id")}
 
     # #### load and prepare raw data
     # extract all needed columns
@@ -265,67 +262,64 @@ def generate_feature_files(window_size: float,
     # filter out non-human controls in data
     raw_data = raw_data[raw_data.trialPhase != 1]
 
-    # load preprocessed segment metadata (will create if not exist)
-    meta_df, seg_dict = load_segment_data(C.RAW_DATA_PATH, C.SEGMENT_DICT_PATH, C.SEGMENT_STATS_PATH, verbose=show_pbar)
+    # load preprocessed episode metadata (will create if not exist);
+    # 1 episode = human control starts -> crash/trial end
+    meta_df, episode_dict = load_episode_data(C.RAW_DATA_PATH, C.SEGMENT_DICT_PATH, C.SEGMENT_STATS_PATH,
+                                              clean_data=True, verbose=show_pbar)
 
-    # clean metadata df, outputs only non-bug human segments for further selection
-    meta_df = _clean_metadata(meta_df)
-
-    # ### filter out crashes based on dataset params
-    # decide which human segments to include based on gap
-    # count of human segs before selection
-    human_seg_count = {"orig_non": sum(meta_df.crash_ind==-1),
+    # ### filter out crashes based on dataset params, decide which episodes to include based on gap
+    # count of human segs before selection, for display only
+    human_epi_count = {"orig_non": sum(meta_df.crash_ind==-1),
                            "orig_crash": sum(meta_df.crash_ind!=-1)}
-    # keep only seg_duration >= gap
-    excluded_segments = meta_df[meta_df.duration <= time_gap]
+    # keep only episode_duration > gap
+    excluded_episodes = meta_df[meta_df.duration <= time_gap]
     meta_df = meta_df[meta_df.duration > time_gap]
-
-    human_seg_count.update({"new_non": sum(meta_df.crash_ind == -1),
+    human_epi_count.update({"new_non": sum(meta_df.crash_ind == -1),
                            "new_crash": sum(meta_df.crash_ind != -1)})
 
-    # print how many crashed human segments excluded
-    print(f"Human control segments:\n"
-          f"{human_seg_count['new_non']} out of {human_seg_count['orig_non']} non-crashed human control segments "
-          f"selected, {human_seg_count['orig_non'] - human_seg_count['new_non']} excluded\n"
-          f"{human_seg_count['new_crash']} out of {human_seg_count['orig_crash']} crashed human control segments "
-          f"selected, {human_seg_count['orig_crash'] - human_seg_count['new_crash']} excluded\n")
+    # print how many crashed human episodes excluded
+    logger.info(f"Human control episodes:\n"
+          f"{human_epi_count['new_non']} out of {human_epi_count['orig_non']} non-crashed human control episodes "
+          f"selected, {human_epi_count['orig_non'] - human_epi_count['new_non']} excluded\n"
+          f"{human_epi_count['new_crash']} out of {human_epi_count['orig_crash']} crashed human control episodes "
+          f"selected, {human_epi_count['orig_crash'] - human_epi_count['new_crash']} excluded\n")
 
     # ### create index dictionary for faster retrieval later from raw data
-    # 1. dict of {<trial key>: [crash segment ids]}. containing valid crashed segments in each trial
-    # 2. dict of {<trial key>: [non-crash segment ids]}. containing valid non-crash segments in each trial
+    # valid_crashed_ids: dict of {<trial key>: [crash episode ids]}. containing valid crashed episodes in each trial
+    # valid_non_crashed_ids: dict of {<trial key>: [non-crash episode ids]}. containing valid non-crash episodes in each trial
     valid_crashed_ids, valid_non_crashed_ids = dict(), dict()
-    for trial_key, segments in meta_df.groupby("trial_key"):
-        valid_crashed_ids[trial_key] = segments[segments.crash_ind != -1].index.tolist()
-        valid_non_crashed_ids[trial_key] = segments[segments.crash_ind == -1].index.tolist()
+    for trial_key, episodes in meta_df.groupby("trial_key"):
+        valid_crashed_ids[trial_key] = episodes[episodes.crash_ind != -1].index.tolist()
+        valid_non_crashed_ids[trial_key] = episodes[episodes.crash_ind == -1].index.tolist()
 
     # #### iterate through trials to process extract features
     with tqdm(total=raw_data.peopleTrialKey.nunique(), disable=not show_pbar) as pbar:
         # extract crash events features from each trial
         for current_trial_key, trial_raw_data in raw_data.groupby("peopleTrialKey"):
-            # for trial key, for each crashed segment in this trial (if any), record crash and non crash windows
+            # for trial key, for each crashed episode in this trial (if any), record crash and non crash windows
             if current_trial_key in valid_crashed_ids:
                 for crashed_id in valid_crashed_ids[current_trial_key]:
                     # time point of crash
-                    crash_time = trial_raw_data.loc[seg_dict[crashed_id]["crash_ind"]].seconds
+                    crash_time = trial_raw_data.loc[episode_dict[crashed_id]["crash_ind"]].seconds
                     # cut off time, time steps on or right of this time receives label 1; else 0
                     crash_cutoff = crash_time - time_ahead
 
                     # extract windows boundaries
-                    seg_df = trial_raw_data.loc[seg_dict[crashed_id]["indices"]]
+                    seg_df = trial_raw_data.loc[episode_dict[crashed_id]["indices"]]
                     seg_windows = _extract_sliding_windows(seg_df.seconds, window_size, time_step)
 
                     # process each window
                     for win_start, win_end in seg_windows:
                         # restore all window entries, bounds inclusive by default
                         entries_in_win = seg_df[seg_df.seconds.between(win_start, win_end)]
-                        # interpolate the window; feature array will be updated in place
-                        _process_window(feat_arrays, entries_in_win, current_trial_key, crash_cutoff, sampling_rate)
+                        # interpolate the window; feature arrays will be updated in place
+                        _process_window(feat_arrays, entries_in_win, current_trial_key, crash_cutoff, sampling_rate, crashed_id)
 
-            # for the non-crashed segment in this trial (if any), do sliding window and interpolate non crash data
+            # for the non-crashed episode in this trial (if any), do sliding window and interpolate non crash data
             if current_trial_key in valid_non_crashed_ids:
                 for non_crashed_id in valid_non_crashed_ids[current_trial_key]:
-                    # get entries of this segment
-                    seg_df = trial_raw_data.loc[seg_dict[non_crashed_id]["indices"]]
+                    # get entries of this episode
+                    seg_df = trial_raw_data.loc[episode_dict[non_crashed_id]["indices"]]
                     # extract and record sliding windows
                     seg_windows = _extract_sliding_windows(seg_df.seconds, window_size, time_step)
                     # process each window
@@ -333,19 +327,16 @@ def generate_feature_files(window_size: float,
                         # restore all window entries, bounds inclusive by default
                         entries_in_win = seg_df[seg_df.seconds.between(win_start, win_end)]
                         # interpolate and process window; cutoff of inf -> labels all 0;
-                        # feature array will be updated in place
-                        _process_window(feat_arrays, entries_in_win, current_trial_key, np.inf, sampling_rate)
+                        # feature arrays will be updated in place
+                        _process_window(feat_arrays, entries_in_win, current_trial_key, np.inf, sampling_rate, non_crashed_id)
 
             pbar.update(1)
 
     # #### Save feature output
-    print("Processing done! \nNow validating and saving features to \"{}\"...".format(out_dir), end="")
+    logger.info("Processing done! \nNow validating and saving features to \"{}\"...".format(out_dir), end="")
 
     # record expected length
     expected_length = len(feat_arrays["label"])
-
-    # split data into train and test based on label
-    _save_test_train_split(feat_arrays["label"], out_dir)
 
     # save column as .npy files, if disk is a concern in future, specify dtype in save_col
     [save_col(value, col_name, out_dir, expect_len=expected_length)
@@ -358,33 +349,53 @@ def generate_feature_files(window_size: float,
                              (feat_arrays["trial_key"], "trial_key"),
                              (feat_arrays["start_sec"], "start_seconds"),
                              (feat_arrays["end_sec"], "end_seconds"),
-                             (feat_arrays["seq_label"], "seq_label")]]
-    print("Done!\n")
+                             (feat_arrays["seq_label"], "seq_label"),
+                             (feat_arrays["episode_id"], "episode_id")]]
+
+    # split data into train and test based on label
+    train_inds, test_inds = _save_test_train_split(feat_arrays["episode_id"], out_dir, valid_non_crashed_ids, valid_crashed_ids)
+
+    logger.info("File generation done!\n")
 
     # record excluded entries for analysis
     debug_base = C.DEBUG_FORMAT.format(int(time_ahead * 1000), int(window_size * 1000))
-    excluded_segments.to_csv(os.path.join(out_dir, debug_base), index=False)
+    excluded_episodes.to_csv(os.path.join(out_dir, debug_base), index=False)
 
     # print processing results
     crash_total = feat_arrays["label"].count(1)
     noncrash_total = feat_arrays["label"].count(0)
-    print("Total crash samples: {}\n"
-          "Total noncrash samples: {}\n"
-          "Total sample size: {}".format(crash_total, noncrash_total, expected_length))
 
-    print("Feature generation done!")
-    calculate_exec_time(begin, scr_name=__file__)
+    # display train-test split statistics
+    y_label = np.array(feat_arrays["label"])
+    train_y = y_label[train_inds]
+    test_y = y_label[test_inds]
+    _, (train0, train1) = np.unique(train_y, return_counts=True)
+    _, (test0, test1) = np.unique(test_y, return_counts=True)
+
+    logger.info("Total crash samples: {}\n"
+                "Total noncrash samples: {}\n"
+                "Total sample size: {}".format(crash_total, noncrash_total, expected_length))
+    logger.info("In training set: \n"
+                "Noncrash samples: {}\n"
+                "Crash samples: {}\n"
+                "Total training set size: {}\n"
+                "Training set 0:1 ratio: {}\n"
+                "In test set:\n"
+                "Noncrash samples: {}\n"
+                "Crash samples: {}\n"
+                "Total test set size: {}\n"
+                "Test set 0:1 ratio: {}\n".format(
+                                                    train0, train1, len(train_y), train0/train1,
+                                                    test0, test1, len(test_y), test0/test1
+                                                 )
+                )
+
+    logger.info("Feature generation done!")
+
+    time_taken = calculate_exec_time(begin, scr_name=__file__)
+    logger.info("Total time taken: {}".format(time_taken))
 
     return expected_length
-
-
-def _save_test_train_split(y_labels: list, out_dir:str):
-    """save stratified test vs. train+val splits"""
-    sss = StratifiedShuffleSplit(n_splits=1, test_size=0.1, random_state=C.RANDOM_SEED)
-    train_inds, test_inds = list(sss.split(np.zeros(len(y_labels)), y_labels))[0]
-    # save split indices
-    np.save(os.path.join(out_dir, C.INDS_PATH['train']), np.array(train_inds))
-    np.save(os.path.join(out_dir, C.INDS_PATH['test']), np.array(test_inds))
 
 
 def broadcast_to_sampled(arr: np.ndarray, arr_sampled: np.ndarray) -> np.ndarray:
@@ -404,5 +415,5 @@ def broadcast_to_sampled(arr: np.ndarray, arr_sampled: np.ndarray) -> np.ndarray
 
 
 if __name__ == "__main__":
-    # TODO why 2000 below ends up with "KeyError: '1_as_P31/01_600back_Block1_trial_001.csv'"???
+    # why 2000 below ends up with "KeyError: '1_as_P31/01_600back_Block1_trial_001.csv'"???
     exp_len = generate_feature_files(2.0, 1.0, 50, 3.0, 0.1, "data/2000window_1000ahead_100rolling", show_pbar=True)

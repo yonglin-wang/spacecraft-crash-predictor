@@ -18,7 +18,7 @@ import consts as C
 def load_dataset(loader: MARSDataLoader,
                  config_id: int,
                  test_split=False,
-                 seq_label=False) -> Tuple[np.ndarray, np.ndarray]:
+                 seq_label=False) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     load X matrix and y matrix with given config number.
     :param loader: loader to retrieve columns from
@@ -41,6 +41,9 @@ def load_dataset(loader: MARSDataLoader,
 
     X_all = config(loader)
 
+    # epi_ids.shape: (num_windows,)
+    epi_ids = loader.retrieve_col("episode_id")
+
     if seq_label:
         y_all = loader.retrieve_col("seq_label").reshape((-1, loader.sampling_rate, 1))
     else:
@@ -53,7 +56,7 @@ def load_dataset(loader: MARSDataLoader,
         # otherwise, return data for CV
         inds = loader.retrieve_inds(get_train_split=True)
 
-    return X_all[inds], y_all[inds]
+    return X_all[inds], y_all[inds], epi_ids[inds]
 
 
 
