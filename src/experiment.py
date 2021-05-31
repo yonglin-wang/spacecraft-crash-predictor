@@ -194,6 +194,8 @@ def train_one_split(args: argparse.Namespace,
     y_pred = y_pred_proba.copy()
     y_pred[y_pred >= args.threshold] = 1
     y_pred[y_pred < args.threshold] = 0
+
+    y_pred, y_test = y_pred.astype(np.uint8), y_test.astype(np.uint8)
     results = compute_test_results(y_pred, y_test, y_pred_proba, eval_res)
 
     # print test set results:

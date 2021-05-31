@@ -333,7 +333,7 @@ def generate_feature_files(window_size: float,
             pbar.update(1)
 
     # #### Save feature output
-    logger.info("Processing done! \nNow validating and saving features to \"{}\"...".format(out_dir), end="")
+    logger.info("Processing done! \nNow validating and saving features to \"{}\"...".format(out_dir))
 
     # record expected length
     expected_length = len(feat_arrays["label"])

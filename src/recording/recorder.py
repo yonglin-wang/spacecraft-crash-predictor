@@ -116,17 +116,25 @@ class Recorder():
                          y_pred: Union[list, np.ndarray]) -> None:
         # generate test DataFrame
         test_df = generate_all_feat_df(self.loader, self.configID, inds=test_inds)
-        test_df[C.PRED_COL] = y_pred
 
+        # append predictions
+        if y_pred.ndim <=2:
+            test_df[C.PRED_COL] = y_pred
+        else:
+            # squeeze sequence labels to (num_samples, sampling_rate)
+            y_pred = y_pred.squeeze(-1)
+            # convert to list of arrays for DataFrame to correctly append new column
+            test_df[C.PRED_COL] = [y_pred[i, :] for i in range(y_pred.shape[0])]
+
+        # reorder so that false predictions come up first
         if self.using_seq_label:
             # compare seq predictions by row
             test_df["seq_matched"] = test_df.apply(lambda row: np.array_equal(row.seq_label, row[C.PRED_COL]), axis=1)
             test_df.sort_values("seq_matched", inplace=True)
         else:
-            # reorder so that false negatives come up first
+            # show false negatives first
             test_df.sort_values(["label", C.PRED_COL], ascending=[False, True], inplace=True)
 
-        # save prediction file
         test_df.to_csv(self.pred_path, index=False)
 
         if self.verbose:

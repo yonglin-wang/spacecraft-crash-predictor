@@ -2,9 +2,10 @@
 # Date: 2021/5/30 4:00 PM
 # Returns a customized Python Logger object for displaying and saving messages
 
-import argparse
+
 import logging
 import os
+
 
 def init_logger(dunder_name: str, output_dir: str, output_file_name: str) -> logging.Logger:
     """Initialize a logger that takes all levels of messages"""

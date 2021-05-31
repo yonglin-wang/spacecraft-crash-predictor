@@ -51,17 +51,6 @@ class EpisodeKFoldSplitter:
 
             yield train_inds, test_inds
 
-        # while 1:
-        #     try:
-        #         train_inds, test_inds = next(split_gen)
-        #
-        #         # must shuffle order, or RNN won't learn!!
-        #         np.random.shuffle(train_inds)
-        #         np.random.shuffle(test_inds)
-        #
-        #         yield train_inds, test_inds
-        #     except StopIteration:
-        #         return
 
 class Splitter:
     def __init__(self,
@@ -121,26 +110,6 @@ class Splitter:
         assert type(self.splitter) == EpisodeKFoldSplitter
 
         return self.splitter.split(y)
-
-        # TODO Delete:
-        # if y has more than 2 dim -> sequence label -> stratified split by whether any 1 is present in sequence
-        # if y.ndim == 3:
-        #     y = y.any(axis=1).astype(int)
-        #
-        # # create split generator based on y of shape (n_samples, 1)
-        # split_gen = self.splitter.split(np.zeros(y.shape[0]), y)
-        #
-        # while 1:
-        #     try:
-        #         train_inds, test_inds = next(split_gen)
-        #
-        #         # must shuffle order, or RNN won't learn!!
-        #         np.random.shuffle(train_inds)
-        #         np.random.shuffle(test_inds)
-        #
-        #         yield train_inds, test_inds
-        #     except StopIteration:
-        #         return
 
     def __leave_out(self, y, names):
         """generate data based on subject names"""
