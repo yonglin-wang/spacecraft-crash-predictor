@@ -43,7 +43,7 @@ These are the exact steps I used to install the exact versions listed above:
 
 In order to run the code properly, you'll need to put under [data/](data/) directory the raw data file ```data_all.csv```, which contains all the raw data under columns listed in ```ESSENTIAL_RAW_COLS``` in [consts.py](src/consts.py).
 
-# Run Experiments
+# Run CV Training Experiments
 
 ```./src/experiment.py``` runs an experiment pipeline, which puts together preprocessing, modeling, evaluation, and logging. 
 
@@ -68,6 +68,27 @@ Under project root, run ```$ ./src/experiment.py -h``` to see all available argu
   ```
   $ ./src/experiment.py --pbar <other arguments>
   ```
+
+# Evaluate Saved Model on Held-out Test Sets
+With [predict.py](src/predict.py), the model obtained from running [expeirment.py](src/experiment.py) above can be evaluated on test sets from datasets, potentially with a different look ahead time. 
+
+## What you'll need
+Before running [predict.py](src/predict.py), you'll need to have run at least 1 experiment where you've saved a model. In this way, the script can read the training record and saved model under [exp/](exp) folder. 
+
+You'll need to specify the id of the experiment (found under ```Experiment ID``` column in ```results/exp_ID_config.csv```). By default, if no ```--ahead``` time is specified, the model will evaluate on the original dataset (which mean the original time ahead).
+
+## Example
+For example, if we want to evaluate the model saved from Experiment 206 (i.e. ```Experiment ID```=206), use
+
+```
+$ .src/predict.py 206
+```
+
+If you'd like to evaluate the model from Experiment 206 on a test set of a different time ahead, e.g. 0.7s (700ms) ahead, specify that time with:
+```
+$ .src/predict.py 206 --ahead 0.7
+```
+Note that if the dataset with the new time ahead does not exist, the program will automatically generate the dataset before evaluating the model.
 
 # Examine Results
 
@@ -129,7 +150,7 @@ Whenever a new feature combination is proposed:
 
 Then, when you create a new instance of ```MARSDataLoader``` and call ```load_splits``` in [dataset_config.py](src/processing/dataset_config.py) with ```config_id=<new config ID>```, the 6-tuple with the new configuration will be returned.
 
-## Code for New Model 
+## Code for New Model Architecture
 Whenever a new model build has been proposed:
 
 - For ```tensorflow.keras.Sequential``` models (see ```LSTM``` and ```GRU``` for examples):
@@ -157,7 +178,7 @@ Whenever you need to add a new option to the experiment:
 2. if you'd like the argument to have a different display name in the [experiment configuration file](results/template/exp_ID_config.csv), add a ```('<option name>', '<name to display in results file>')``` to the ```COL_CONV``` dictionary in [consts.py](src/consts.py), 
 3. new settings by default gets appended after the template columns. To have the new option appear in a specific place, add it to the template, and the change will be reflected after the experiment output has been cleared.
 
-Note: only numbers, booleans, and strings will be saved. See ```ACCEPTABLE_TYPES``` in [consts.py](src/consts.py).
+Note: only numbers, booleans, np.float, and strings will be saved. See ```ACCEPTABLE_TYPES``` in [consts.py](src/consts.py).
 
 ## Clearing Experiment Output
 

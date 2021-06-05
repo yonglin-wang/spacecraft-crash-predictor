@@ -32,21 +32,13 @@ tf.random.set_seed(C.RANDOM_SEED)  # tensorflow pseudo-random generator
 
 
 def train(args: argparse.Namespace):
-    # ### Begin script
-    # confirm TensorFlow sees the GPU
-    # assert 'GPU' in str(device_lib.list_local_devices()), "TensorFlow cannot find GPU"
-    #
-    # # confirm Keras sees the GPU (for TensorFlow 1.X + Keras)
-    # assert len(tensorflow_backend._get_available_gpus()) > 0, "Keras cannot find GPU"
-
     # ### time the script
     begin = time.time()
 
     # ### prepare data and other args
     loader = MARSDataLoader(args.window, args.ahead, args.rate, args.gap, args.rolling,
                             verbose=not args.silent, show_pbar=args.pbar)
-    recorder = Recorder(loader, vars(args), verbose=not args.silent)
-
+    recorder = Recorder(loader, vars(args), args.seq_label, verbose=not args.silent)
 
     # calculate class weight:
     if args.crash_ratio >= 1:
@@ -62,14 +54,20 @@ def train(args: argparse.Namespace):
     else:
         fit_ver = 2  # only one line per epoch in output file
 
-    X_all, y_all = load_dataset(loader, args.configID)
+    # load dataset with loader object
+    X_all, y_all, epi_ids_all = load_dataset(loader, args.configID, seq_label=recorder.using_seq_label)
+    assert len(X_all) == len(y_all) == len(epi_ids_all), \
+        "Length mismatch. X: {}, y: {}, Episode ids: {}".format(X_all.shape, y_all.shape, epi_ids_all.shape)
 
     # get generator for splitting
-    splitter = Splitter(args.cv_mode, args.cv_splits, verbose=loader.verbose)
+    if args.cv_mode == C.NO_CV:
+        # ensure split # is 1 when no CV
+        args.cv_splits = 1
+    splitter = Splitter(args.cv_mode, args.cv_splits, epi_ids_all, verbose=loader.verbose)
     if args.cv_mode == C.NO_CV or args.cv_mode == C.KFOLD:
         split_gen = splitter.split_ind_generator(y_all)
     elif args.cv_mode == C.LEAVE_OUT:
-        split_gen = splitter.split_ind_generator(y_all, loader.retrieve_col("person"))
+        split_gen = splitter.split_ind_generator(y_all, subject_names=loader.retrieve_col("person"))
     else:
         raise NotImplementedError
 
@@ -77,15 +75,13 @@ def train(args: argparse.Namespace):
     all_split_results = OrderedDict([(metric_name, []) for metric_name in C.RES_COLS])
 
     # record best performing stats and model for saving results
-    best_test_inds = None
-    best_y_preds = None
-    best_model = None
-    best_norm_stat = None
+    best_test_inds, best_y_preds, best_model, best_norm_stat = None, None, None, None
     best_split_num = -1
     best_performance_metric = 0
     all_epochs = []
     all_training_history = []
 
+    # start training each split!
     for split_number, (train_inds, test_inds) in enumerate(split_gen):
         # validate data size
         assert loader.total_sample_size == train_inds.shape[0] + test_inds.shape[0], "train test numbers don't add up"
@@ -97,7 +93,7 @@ def train(args: argparse.Namespace):
         train_hist, model, val_results, y_preds, normalization_stats = train_one_split(args, loader,
                                                                           X_all, y_all,
                                                                           train_inds, test_inds,
-                                                                          fit_ver, class_weight)
+                                                                          fit_ver, class_weight, recorder.using_seq_label)
         # append split results
         for metric_name in all_split_results:
             all_split_results[metric_name].append(val_results[metric_name])
@@ -106,7 +102,7 @@ def train(args: argparse.Namespace):
         all_training_history.append(train_hist.history)
         all_epochs.append(len(train_hist.epoch))
 
-        # compare results and save best performing set of objects for recording
+        # compare results based on AUC and save best performing set of objects for recording
         if val_results[C.PERF_METRIC] > best_performance_metric:
             best_performance_metric = val_results[C.PERF_METRIC]
             best_test_inds, best_y_preds, best_model, best_split_num, best_norm_stat = \
@@ -139,7 +135,8 @@ def train_one_split(args: argparse.Namespace,
                     train_inds: np.ndarray,
                     test_inds: np.ndarray,
                     fit_ver: int,
-                    class_weight: dict
+                    class_weight: dict,
+                    seq_label: bool
                     ) -> Tuple[tf.keras.callbacks.History, tf.keras.Sequential, dict, np.ndarray, dict]:
     """function that trains a model and returns train history, the model, and test set results dictionary"""
     # get train and test data from indices
@@ -154,10 +151,11 @@ def train_one_split(args: argparse.Namespace,
         norm_feat_inds = find_col_inds_for_normalization(args.configID, args.normalize)
         X_train, X_test, norm_stats = normalize_col(norm_feat_inds, X_train, X_test)
 
+    # print split info
     if loader.verbose:
-        # print split info
         print_split_info(train_inds, test_inds, X_train, X_test, y_train, y_test)
 
+    # prepare callback for early stopping
     if args.early_stop:
         callback = [tf.keras.callbacks.EarlyStopping(monitor=args.conv_crit,
                                                      patience=args.patience,
@@ -165,9 +163,12 @@ def train_one_split(args: argparse.Namespace,
     else:
         callback = None
 
-    # ### start training
+    # prepare sample weights
+    sample_weights = _convert_class_weight_to_sample_weight(class_weight, y_train)
+
+    # ### start training a model
     # build model
-    model = match_and_build_model(args, X_train)
+    model = match_and_build_model(args, X_train, seq_label)
 
     # train model
     history = model.fit(
@@ -177,7 +178,7 @@ def train_one_split(args: argparse.Namespace,
         validation_split=0.1,
         verbose=fit_ver,
         shuffle=False,
-        class_weight=class_weight,
+        sample_weight=sample_weights,
         callbacks=callback
     )
 
@@ -185,12 +186,16 @@ def train_one_split(args: argparse.Namespace,
     if not args.silent:
         print("Now evaluating, metrics used: {}".format(model.metrics_names))
 
-    # generate result stats
+    # generate result stats;
+    # by default, label eval metrics are element-wise, regardless of scalar or vector labels
     eval_res = model.evaluate(X_test, y_test, return_dict=True, verbose=int(args.pbar))
     y_pred_proba = model.predict(X_test)
+    # get prediction based on threshold and y proba
     y_pred = y_pred_proba.copy()
     y_pred[y_pred >= args.threshold] = 1
     y_pred[y_pred < args.threshold] = 0
+
+    y_pred, y_test = y_pred.astype(np.uint8), y_test.astype(np.uint8)
     results = compute_test_results(y_pred, y_test, y_pred_proba, eval_res)
 
     # print test set results:
@@ -199,6 +204,16 @@ def train_one_split(args: argparse.Namespace,
 
     return history, model, results, y_pred, norm_stats
 
+
+def _convert_class_weight_to_sample_weight(class_weights:dict, y_labels: np.ndarray) -> np.ndarray:
+    """convert 0 and 1 in y-labels to their corresponding weights"""
+    weight_arr = y_labels.copy()
+
+    # convert each class label to weight
+    for c, w in class_weights.items():
+        weight_arr[y_labels == c] = w
+
+    return weight_arr
 
 def normalize_col(col_inds: list,
                   train_data: np.ndarray,
@@ -248,11 +263,12 @@ def find_col_inds_for_normalization(config_ID: int, mode: str) -> list:
         raise NotImplementedError()
 
 
-def match_and_build_model(args, X_train: np.ndarray)->tf.keras.Sequential:
+def match_and_build_model(args, X_train: np.ndarray, seq_label: bool)->tf.keras.Sequential:
     """helper function to return correct model based on given input"""
     if args.model in C.RNN_MODELS:
         model = build_keras_rnn(X_train.shape[1],
                                 X_train.shape[2],
+                                seq_label,
                                 rnn_out_dim=args.hidden_dim,
                                 dropout_rate=args.dropout,
                                 rnn_type=args.model)
@@ -265,15 +281,10 @@ def match_and_build_model(args, X_train: np.ndarray)->tf.keras.Sequential:
 def compute_test_results(y_pred, y_true, y_proba, eval_res):
     """helper function to compute and return dictionary containing all results"""
 
-    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
-
-    try:
-        f1 = (2 * eval_res[C.PRECISION] * eval_res[C.RECALL])/(eval_res[C.PRECISION] + eval_res[C.RECALL])
-    except ZeroDivisionError:
-        f1 = np.nan
+    tn, fp, fn, tp = confusion_matrix(y_true.flatten(), y_pred.flatten()).ravel()
 
     output = {
-                "total": int(y_pred.shape[0]),
+                "total": int(sum([tn, fp, fn, tp])),
                 "tn": int(tn),
                 "fp": int(fp),
                 "fn": int(fn),
@@ -282,14 +293,13 @@ def compute_test_results(y_pred, y_true, y_proba, eval_res):
                 "precision": eval_res[C.PRECISION],
                 "recall": eval_res[C.RECALL],
                 "auc_tf": eval_res[C.AUC],
-                "auc_sklearn": roc_auc_score(y_true, y_proba),
+                "auc_sklearn": roc_auc_score(y_true.flatten(), y_proba.flatten()),
             }
 
     try:
         f1 = (2 * eval_res[C.PRECISION] * eval_res[C.RECALL])/(eval_res[C.PRECISION] + eval_res[C.RECALL])
     except ZeroDivisionError:
         f1 = np.nan
-
     output["f1"] = f1
 
     # assert no difference between this and predefined output columns
@@ -339,9 +349,10 @@ def print_split_info(inds_train, inds_test, X_train, X_test, y_train, y_test):
         "y_test shape: {:>21}\n".
             format(inds_train.shape[0] + inds_test.shape[0],
                    inds_train.shape[0],
-                   int(sum(y_train==1)),
+                   int(np.where(y_train ==1)[0].shape[0]),  # works for both (n_sample, 1)
+                                                            # and (n_sample, sampling_rate, 1)
                    inds_test.shape[0],
-                   int(sum(y_test == 1)),
+                   int(np.where(y_test ==1)[0].shape[0]),
                    str(X_train.shape),
                    str(X_test.shape),
                    str(y_train.shape),
@@ -369,6 +380,10 @@ def main():
         '--gap', type=int, default=0, help='minimal time gap allowed between two crash events for data extraction. '
                                            'Will be recalculated to be at least [2 * window_size + time_ahead].'
                                            'Set to 0 to get auto calculation. ')
+    argparser.add_argument(
+        '--seq_label', action='store_true',
+        help='whether to use sequential labels of shape (sampling_rate,) for each sample; '
+             'otherwise, binary scalar is used.')
 
     # General training flags
     argparser.add_argument(

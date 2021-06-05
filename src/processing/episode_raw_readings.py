@@ -4,7 +4,7 @@
 import pickle
 from collections import OrderedDict, defaultdict
 import os
-from typing import Tuple
+from typing import Tuple, List
 
 import pandas as pd
 import numpy as np
@@ -59,8 +59,9 @@ def display_all_segments(seg_dict, output_cols) -> pd.DataFrame:
     return pd.DataFrame.from_records(record_list)
 
 
-def load_segment_data(raw_data_path: str, output_pickle_path: str, output_csv_path: str, verbose=True) -> Tuple[
-    pd.DataFrame, OrderedDict]:
+def load_episode_data(raw_data_path: str, output_pickle_path: str, output_csv_path: str,
+                      clean_data=True, verbose=True
+                      ) -> Tuple[pd.DataFrame, OrderedDict]:
     """Load readings from raw data path, generate and save pickled segment information dictionary and segment stats DataFrame"""
 
     if not os.path.exists(output_pickle_path) or not os.path.exists(output_csv_path):
@@ -90,7 +91,60 @@ def load_segment_data(raw_data_path: str, output_pickle_path: str, output_csv_pa
         out_df = pd.read_csv(output_csv_path, index_col="id")
         all_segs = pickle.load(open(output_pickle_path, "rb"))
 
+    # clean metadata df, outputs only non-bug human episodes for further selection
+    if clean_data:
+        out_df = _clean_metadata(out_df)
+
     return out_df, all_segs
 
+
+def _clean_metadata(meta_df: pd.DataFrame) -> pd.DataFrame:
+    """remove buggy data entry from the given episode metadata df, return the debugged df"""
+    # retain only human control episodes (phase = 3)
+    meta_df = meta_df[meta_df.phase == 3]
+    # locate buggy indices. current condition: single-reading human episodes and their corresponding crashes
+    buggy_human_segs = meta_df[meta_df.reading_num <= C.MIN_ENTRIES_IN_WINDOW].index
+    assert len(buggy_human_segs) == 16
+
+    return meta_df.drop(meta_df[meta_df.index.isin(set(buggy_human_segs))].index)
+
+
+def get_crash_non_crash_ids() -> Tuple[List[int], List[int]]:
+    """return list of all crash episode ids and list of non-crash episode ids"""
+    meta_df, episode_dict = load_episode_data(C.RAW_DATA_PATH, C.SEGMENT_DICT_PATH, C.SEGMENT_STATS_PATH,
+                                              clean_data=True, verbose=False)
+    crash_ids = meta_df[meta_df.crash_ind != -1].index.tolist()
+    non_crash_ids = meta_df[meta_df.crash_ind == -1].index.tolist()
+
+    return crash_ids, non_crash_ids
+
+
+def count_episode_exclusion(time_gap: float):
+    """test function for displaying exclusion statistics"""
+    print(f"excluding episodes <= {time_gap} seconds")
+    meta_df, segs_dict = load_episode_data(C.RAW_DATA_PATH, C.SEGMENT_DICT_PATH, C.SEGMENT_STATS_PATH)
+
+    human_epi_count = {"orig_non": sum(meta_df.crash_ind == -1),
+                       "orig_crash": sum(meta_df.crash_ind != -1)}
+    # keep only episode_duration > gap
+    meta_df = meta_df[meta_df.duration > time_gap]
+    human_epi_count.update({"new_non": sum(meta_df.crash_ind == -1),
+                            "new_crash": sum(meta_df.crash_ind != -1)})
+    non_crash_excluded = human_epi_count['orig_non'] - human_epi_count['new_non']
+    crash_excluded = human_epi_count['orig_crash'] - human_epi_count['new_crash']
+    print(f"Human control episodes:\n"
+                f"{human_epi_count['new_non']} out of {human_epi_count['orig_non']} non-crashed human control episodes "
+                f"selected, {non_crash_excluded} ({non_crash_excluded/human_epi_count['orig_non']}) excluded\n"
+                f"{human_epi_count['new_crash']} out of {human_epi_count['orig_crash']} crashed human control episodes "
+                f"selected, {crash_excluded} ({crash_excluded/human_epi_count['orig_crash']}) excluded\n")
+
 if __name__ == "__main__":
-    df, segs_dict = load_segment_data(C.RAW_DATA_PATH, C.SEGMENT_DICT_PATH, C.SEGMENT_STATS_PATH)
+    # count_episode_exclusion(1)
+    # count_episode_exclusion(2)
+    # count_episode_exclusion(3)
+    # count_episode_exclusion(4)
+    # count_episode_exclusion(5)
+    # count_episode_exclusion(6)
+    count_episode_exclusion(2.3)
+    count_episode_exclusion(2.5)
+    count_episode_exclusion(2.7)
