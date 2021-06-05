@@ -42,12 +42,20 @@ class EpisodeKFoldSplitter:
             train_episode_id = self.crash_epi_ids[crash_train_inds].tolist() + self.non_crash_epi_ids[noncrash_train_inds].tolist()
             test_episode_id = self.crash_epi_ids[crash_test_inds].tolist() + self.non_crash_epi_ids[noncrash_test_inds].tolist()
 
+            # convert episode splits to actual window splits
             train_inds = np.where(np.isin(self.episode_ids, train_episode_id))[0]
             test_inds = np.where(np.isin(self.episode_ids, test_episode_id))[0]
 
             # must shuffle order, or RNN won't learn!!
             np.random.shuffle(train_inds)
             np.random.shuffle(test_inds)
+
+            assert train_inds.shape[0] + test_inds.shape[0] == self.episode_ids.shape[0], \
+                "train ({}) test ({}) splits (total: {}) don't add up to original training set total ({})".format(
+                    train_inds.shape[0],
+                    test_inds.shape[0],
+                    train_inds.shape[0] + test_inds.shape[0],
+                    self.episode_ids.shape[0])
 
             yield train_inds, test_inds
 
