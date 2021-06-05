@@ -16,6 +16,8 @@ SEGMENT_COLS = ['seconds', 'trialPhase', 'peopleName', 'peopleTrialKey']
 ID = "id"
 OUTPUT_COLS = ["duration", "reading_num", "phase", "crash_ind", "subject", "trial_key"]
 DATA_DIR = "data"
+os.makedirs(DATA_DIR, exist_ok=True)
+
 SEGMENT_DICT_PATH = os.path.join(DATA_DIR, "segment_dict.pkl")
 SEGMENT_STATS_PATH = os.path.join(DATA_DIR, "segment_stats.csv")
 
@@ -119,6 +121,14 @@ CATEGORICAL_FEATS = {'destabilizing'}
 # -----
 # Model Training Constants
 # -----
+# general experiment path
+EXP_PATH = "exp"
+os.makedirs(EXP_PATH, exist_ok=True)
+
+# training log directory
+TRAINING_LOG_DIR = os.path.join(EXP_PATH, "train_logs")
+os.makedirs(TRAINING_LOG_DIR, exist_ok=True)
+TRAINING_LOG_FILE = os.path.join(TRAINING_LOG_DIR, "exp{}_split{}")
 
 # convergence criteria, must be consistent with what EarlyStopping supports
 VAL_LOSS = "val_loss"
@@ -157,8 +167,7 @@ NO_CV = "disable"
 KFOLD = "kfold"
 LEAVE_OUT = "leave_out"
 CV_OPTIONS = [NO_CV, KFOLD, LEAVE_OUT]
-# general experiment path
-EXP_PATH = "exp/"
+
 
 # experiment path
 EXP_FORMAT = os.path.join(EXP_PATH, "exp{}_{}win_{}ahead_conf{}_{}")  # e.g.exp1_1000win_500scale_conf1_lstm"

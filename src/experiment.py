@@ -93,7 +93,8 @@ def train(args: argparse.Namespace):
         train_hist, model, val_results, y_preds, normalization_stats = train_one_split(args, loader,
                                                                           X_all, y_all,
                                                                           train_inds, test_inds,
-                                                                          fit_ver, class_weight, recorder.using_seq_label)
+                                                                          fit_ver, class_weight, recorder.using_seq_label,
+                                                                          recorder.exp_ID, split_number + 1)
         # append split results
         for metric_name in all_split_results:
             all_split_results[metric_name].append(val_results[metric_name])
@@ -136,7 +137,9 @@ def train_one_split(args: argparse.Namespace,
                     test_inds: np.ndarray,
                     fit_ver: int,
                     class_weight: dict,
-                    seq_label: bool
+                    seq_label: bool,
+                    exp_number: int,
+                    split_number: int
                     ) -> Tuple[tf.keras.callbacks.History, tf.keras.Sequential, dict, np.ndarray, dict]:
     """function that trains a model and returns train history, the model, and test set results dictionary"""
     # get train and test data from indices
@@ -156,12 +159,16 @@ def train_one_split(args: argparse.Namespace,
         print_split_info(train_inds, test_inds, X_train, X_test, y_train, y_test)
 
     # prepare callback for early stopping
+    callback = []
     if args.early_stop:
-        callback = [tf.keras.callbacks.EarlyStopping(monitor=args.conv_crit,
+        callback.append(tf.keras.callbacks.EarlyStopping(monitor=args.conv_crit,
                                                      patience=args.patience,
-                                                     mode=C.CONV_MODE[args.conv_crit])]
-    else:
-        callback = None
+                                                     mode=C.CONV_MODE[args.conv_crit]))
+
+    # record experiment on tensorboard
+    log_dir = C.TRAINING_LOG_FILE.format(exp_number, split_number)
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+    callback.append(tensorboard_callback)
 
     # prepare sample weights
     sample_weights = _convert_class_weight_to_sample_weight(class_weight, y_train)

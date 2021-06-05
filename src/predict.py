@@ -14,12 +14,9 @@ import numpy as np
 import tensorflow.keras as keras
 import pandas as pd
 
-from tqdm import tqdm
-
 import argparse
 import random
 
-from utils import calculate_exec_time
 import consts as C
 from processing.marsdataloader import MARSDataLoader
 from recording.recorder import Recorder
