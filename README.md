@@ -81,12 +81,12 @@ You'll need to specify the id of the experiment (found under ```Experiment ID```
 For example, if we want to evaluate the model saved from Experiment 206 (i.e. ```Experiment ID```=206), use
 
 ```
-$ python src/predict.py 206
+$ .src/predict.py 206
 ```
 
 If you'd like to evaluate the model from Experiment 206 on a test set of a different time ahead, e.g. 0.7s (700ms) ahead, specify that time with:
 ```
-$ python src/predict.py 206 --ahead 0.7
+$ .src/predict.py 206 --ahead 0.7
 ```
 Note that if the dataset with the new time ahead does not exist, the program will automatically generate the dataset before evaluating the model.
 
