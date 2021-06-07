@@ -40,13 +40,14 @@ def train(args: argparse.Namespace):
                             verbose=not args.silent, show_pbar=args.pbar)
     recorder = Recorder(loader, vars(args), args.seq_label, verbose=not args.silent)
 
-    # calculate class weight:
+    # calculate crash weight (assume non-crash has weight of 1)
     if args.crash_ratio >= 1:
-        class_weight = {0: 1, 1: args.crash_ratio}
-    elif args.crash_ratio <= 0:
-        raise ValueError("Crash ratio must be positive!")
+        class_weights = {0: 1, 1: args.crash_ratio}
+    elif args.crash_ratio == 0:
+        # balancing implemented after splitting
+        class_weights = {0: 1, 1: 1}
     else:
-        class_weight = {0: 1 - args.crash_ratio, 1: args.crash_ratio}
+        raise ValueError("Crash ratio must be >=1, or 0 for auto balancing")
 
     # prepare args
     if args.pbar:
@@ -69,7 +70,7 @@ def train(args: argparse.Namespace):
     elif args.cv_mode == C.LEAVE_OUT:
         split_gen = splitter.split_ind_generator(y_all, subject_names=loader.retrieve_col("person"))
     else:
-        raise NotImplementedError
+        raise NotImplementedError(f"Cannot recognize: {args.cv_mode}")
 
     # create results dictionary
     all_split_results = OrderedDict([(metric_name, []) for metric_name in C.RES_COLS])
@@ -89,11 +90,15 @@ def train(args: argparse.Namespace):
         if loader.verbose:
             print(f"Now training split #{split_number + 1} out of total {args.cv_splits}...")
 
+        # balance weight
+        if args.crash_ratio == 0:
+            class_weights[1] = _balance_weight(loader, train_inds)
+
         # train split
         train_hist, model, val_results, y_preds, normalization_stats = train_one_split(args, loader,
                                                                           X_all, y_all,
                                                                           train_inds, test_inds,
-                                                                          fit_ver, class_weight, recorder.using_seq_label,
+                                                                          fit_ver, class_weights, recorder.using_seq_label,
                                                                           recorder.exp_ID, split_number + 1)
         # append split results
         for metric_name in all_split_results:
@@ -129,6 +134,17 @@ def train(args: argparse.Namespace):
         recorder.save_predictions(best_test_inds, best_y_preds)
 
 
+def _balance_weight(loader: MARSDataLoader, train_inds: np.ndarray) -> float:
+    """return balanced crash weight (assume non-crash has 1) in each CV fold"""
+    # calculate based on single-label y labels
+    y_labels = loader.retrieve_col("label")[train_inds]
+    crash_size = np.sum(y_labels == 1)
+    non_crash_size = np.sum(y_labels == 0)
+
+    return non_crash_size/crash_size
+
+
+
 def train_one_split(args: argparse.Namespace,
                     loader: MARSDataLoader,
                     X_all: np.ndarray,
@@ -136,8 +152,8 @@ def train_one_split(args: argparse.Namespace,
                     train_inds: np.ndarray,
                     test_inds: np.ndarray,
                     fit_ver: int,
-                    class_weight: dict,
-                    seq_label: bool,
+                    class_weights: dict,
+                    using_seq_label: bool,
                     exp_number: int,
                     split_number: int
                     ) -> Tuple[tf.keras.callbacks.History, tf.keras.Sequential, dict, np.ndarray, dict]:
@@ -156,7 +172,7 @@ def train_one_split(args: argparse.Namespace,
 
     # print split info
     if loader.verbose:
-        print_split_info(train_inds, test_inds, X_train, X_test, y_train, y_test)
+        print_split_info(train_inds, test_inds, X_train, X_test, y_train, y_test, class_weights)
 
     # prepare callback for early stopping
     callback = []
@@ -170,12 +186,12 @@ def train_one_split(args: argparse.Namespace,
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
     callback.append(tensorboard_callback)
 
-    # prepare sample weights
-    sample_weights = _convert_class_weight_to_sample_weight(class_weight, y_train)
+    # prepare sample weight matrix
+    sample_weights = _convert_class_weight_to_sample_weight(class_weights, y_train)
 
     # ### start training a model
     # build model
-    model = match_and_build_model(args, X_train, seq_label)
+    model = match_and_build_model(args, X_train, using_seq_label)
 
     # train model
     history = model.fit(
@@ -270,12 +286,12 @@ def find_col_inds_for_normalization(config_ID: int, mode: str) -> list:
         raise NotImplementedError()
 
 
-def match_and_build_model(args, X_train: np.ndarray, seq_label: bool)->tf.keras.Sequential:
+def match_and_build_model(args, X_train: np.ndarray, using_seq_label: bool)->tf.keras.Sequential:
     """helper function to return correct model based on given input"""
     if args.model in C.RNN_MODELS:
         model = build_keras_rnn(X_train.shape[1],
                                 X_train.shape[2],
-                                seq_label,
+                                using_seq_label,
                                 rnn_out_dim=args.hidden_dim,
                                 dropout_rate=args.dropout,
                                 rnn_type=args.model)
@@ -340,7 +356,7 @@ def print_training_info(args: argparse.Namespace):
     print("")
 
 
-def print_split_info(inds_train, inds_test, X_train, X_test, y_train, y_test):
+def print_split_info(inds_train, inds_test, X_train, X_test, y_train, y_test, class_weights):
     """print shapes of split"""
     print(
         "Train-test split Information\n"
@@ -353,7 +369,8 @@ def print_split_info(inds_train, inds_test, X_train, X_test, y_train, y_test):
         "X_train shape: {:>20}\n"
         "X_test shape: {:>21}\n"
         "y_train shape: {:>20}\n"
-        "y_test shape: {:>21}\n".
+        "y_test shape: {:>21}\n"
+        "Class weigths: {}".
             format(inds_train.shape[0] + inds_test.shape[0],
                    inds_train.shape[0],
                    int(np.where(y_train ==1)[0].shape[0]),  # works for both (n_sample, 1)
@@ -363,7 +380,8 @@ def print_split_info(inds_train, inds_test, X_train, X_test, y_train, y_test):
                    str(X_train.shape),
                    str(X_test.shape),
                    str(y_train.shape),
-                   str(y_test.shape))
+                   str(y_test.shape),
+                   class_weights)
     )
 
 
@@ -422,7 +440,8 @@ def main():
     argparser.add_argument(
         '--crash_ratio', type=float, default=1,
         help='if >= 1, processed as 1:ratio noncrash-crash ratio; '
-             'if < 1 and > 0, processed as (1-ratio):ratio noncrash-crash ratio')
+             'if < 1 and > 0, processed as (1-ratio):ratio noncrash-crash ratio; '
+             'if = 0, processed as balanced class-weight for each split.')
     argparser.add_argument(
         '--dropout', type=float, default=0.5,
         help='dropout rate in RNNs')

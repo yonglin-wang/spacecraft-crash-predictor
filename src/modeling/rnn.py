@@ -12,7 +12,7 @@ from tensorflow.keras.layers import Dense, Dropout, TimeDistributed
 import consts as C
 
 
-def build_keras_rnn(sampling_rate, feature_num, seq_label: bool,
+def build_keras_rnn(sampling_rate, feature_num, using_seq_label: bool,
                     rnn_out_dim=128,
                     dropout_rate=0.5,
                     rnn_type=C.LSTM,
@@ -27,7 +27,7 @@ def build_keras_rnn(sampling_rate, feature_num, seq_label: bool,
             keras.layers.LSTM(
                 units=rnn_out_dim,
                 input_shape=[sampling_rate, feature_num],
-                return_sequences=seq_label
+                return_sequences=using_seq_label
             )
         )
     elif rnn_type == C.GRU:
@@ -35,7 +35,7 @@ def build_keras_rnn(sampling_rate, feature_num, seq_label: bool,
             keras.layers.GRU(
                 units=rnn_out_dim,
                 input_shape=[sampling_rate, feature_num],
-                return_sequences=seq_label
+                return_sequences=using_seq_label
             )
         )
     elif rnn_type == C.LSTM_LSTM:
@@ -47,12 +47,12 @@ def build_keras_rnn(sampling_rate, feature_num, seq_label: bool,
                 input_shape=[sampling_rate, feature_num]
             )
         )
-        model_out.add(keras.layers.LSTM(rnn_out_dim), return_sequences=seq_label)
+        model_out.add(keras.layers.LSTM(rnn_out_dim), return_sequences=using_seq_label)
     else:
         raise NotImplementedError("RNN does not recognize {}".format(rnn_type))
 
     # add FFNN
-    if seq_label:
+    if using_seq_label:
         # feed hidden state at each time step to the same FFNN
         # tutorial see: https://machinelearningmastery.com/timedistributed-layer-for-long-short-term-memory-networks-in-python/
         model_out.add(TimeDistributed(Dropout(rate=dropout_rate, seed=C.RANDOM_SEED)))
