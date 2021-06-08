@@ -152,6 +152,11 @@ AUC = "auc"
 PRECISION = "precision"
 RECALL = "recall"
 ACC = "accuracy"
+PAT85R = "P@85R"
+PAT90R = "P@90R"
+PAT95R = "P@95R"
+PAT99R = "P@99R"
+ALL_PATR = [PAT85R, PAT90R, PAT95R, PAT99R]     # adjust this list if Precision-at-Recalls are altered
 
 # model file name under path
 MODEL_PATH = "model"
@@ -215,7 +220,8 @@ CONFIG_DESC_COL_NAME = "dataset config desc"
 
 # results .csv values
 PERF_METRIC = 'auc_sklearn'
-RES_COLS = ['auc_tf', 'auc_sklearn', 'precision', 'recall', 'f1', 'accuracy', 'tn', 'fp', 'fn', 'tp', 'total']
+RES_COLS = ['auc_tf', 'auc_sklearn', 'precision', 'recall', 'f1',
+            'accuracy', 'tn', 'fp', 'fn', 'tp', 'total'] + ALL_PATR
 ALL_RES_CSV_PATH = os.path.join(RESULT_DIR, "exp_results_all.csv")
 TEMPLATE_ALL_RES = os.path.join(RESULT_DIR, "template", "exp_results_all.csv")
 MEAN_SUFFIX = "_mean"

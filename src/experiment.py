@@ -317,6 +317,10 @@ def compute_test_results(y_pred, y_true, y_proba, eval_res):
                 "recall": eval_res[C.RECALL],
                 "auc_tf": eval_res[C.AUC],
                 "auc_sklearn": roc_auc_score(y_true.flatten(), y_proba.flatten()),
+                C.PAT85R: eval_res[C.PAT85R],
+                C.PAT90R: eval_res[C.PAT90R],
+                C.PAT95R: eval_res[C.PAT95R],
+                C.PAT99R: eval_res[C.PAT99R],
             }
 
     try:
