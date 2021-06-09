@@ -439,7 +439,7 @@ def main():
              f'{C.NORM_ALL}: normalize all non-categorical features; '
              f'{C.NORM_LARGE}: normalize the following large-value features, if present: {", ".join(C.LARGE_VAL_FEATS)}')
     argparser.add_argument(
-        '--model', type=str.lower, default=C.LSTM, choices=C.AVAILABLE_MODELS,
+        '--model', type=str.lower, default=C.GRU, choices=C.AVAILABLE_MODELS,
         help='type of model used')
     argparser.add_argument(
         '--crash_ratio', type=float, default=1,
