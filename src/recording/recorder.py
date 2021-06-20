@@ -139,7 +139,7 @@ class Recorder():
             # show false negatives first
             test_df.sort_values(["label", C.PRED_COL], ascending=[False, True], inplace=True)
             # pop seq_label column since not needed
-            test_df.drop(["seq_label"], axis=1)
+            test_df.drop(["seq_label"], axis=1, inplace=True)
 
         # save correct and incorrect predictions separately if both paths are given; otherwise, save in one file
         if true_preds_path and false_preds_path and not self.using_seq_label:
