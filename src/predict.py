@@ -243,7 +243,7 @@ def run_prediction(args: argparse.Namespace):
     print(f"Evaluation results at {threshold} decision threshold: {all_res}")
 
     # Save prediction at results <exp_id>_<win>win_<ahead>ahead.npz
-    pred_ID = _save_prediction_results(all_res, exp_recorder, current_dataset_loader, threshold)
+    pred_ID = _save_prediction_results(all_res, exp_recorder, current_dataset_loader, threshold, recall_at=args.at_recall)
 
     if args.save_preds_csv or args.save_preds_npz:
         # save the actual predictions for each data, if needed
