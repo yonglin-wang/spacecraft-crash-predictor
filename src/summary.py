@@ -117,6 +117,49 @@ def __get_train_test_inds_labels(dataset_dir: str) -> Tuple[np.ndarray, np.ndarr
     return train_inds, test_inds, labels
 
 
+def debug_datasets(dataset_parent_dir:str, stats_csv_save_path: str, verbose=False):
+    """generate dataset stats and save at given path"""
+    # find dataset folders in dataset dir
+    datasets = []
+    pat = re.compile(C.DATASET_PATTERN)
+    for path in os.listdir(dataset_parent_dir):
+        match = pat.match(path)
+        if match:
+            # record dataset path, win, ahead, rolling
+            datasets.append([os.path.join(dataset_parent_dir, match.group(0)),
+                             match.group(1), match.group(2), match.group(3)])
+
+    all_dataset_stats = []
+    for dataset_dir, window, ahead, rolling in datasets:
+        # get train, test inds, and labels
+        train_inds, test_inds, labels = __get_train_test_inds_labels(dataset_dir)
+        train_labels, test_labels = labels[train_inds], labels[test_inds]
+        exc_non, exc_crash = __get_excluded_number(dataset_dir)
+
+        # Record stats
+        all_dataset_stats.append({
+                                "window": window,
+                                "time ahead": ahead,
+                                "rolling step": rolling,
+                                "train crash count": np.sum(train_labels == 1),
+                                "train noncrash count": np.sum(train_labels == 0),
+                                "train 0:1 ratio": np.sum(train_labels == 0)/np.sum(train_labels == 1),
+                                "test crash count": np.sum(test_labels == 1),
+                                "test noncrash count": np.sum(test_labels == 0),
+                                "test 0:1 ratio": np.sum(test_labels == 0) / np.sum(test_labels == 1),
+                                "dataset total": labels.shape[0],
+                                "train set total": train_labels.shape[0],
+                                "test set total": test_labels.shape[0],
+                                "excluded non-crashed segment total": exc_non,
+                                "excluded crashed segment total": exc_crash
+                                })
+    # generate and save dataset csv file
+    pd.DataFrame(all_dataset_stats).to_csv(stats_csv_save_path)
+
+    if verbose:
+        print(f"Statistics for {len(datasets)} datasets saved at {stats_csv_save_path}")
+
+
 def main():
     # Argparser
     # noinspection PyTypeChecker

@@ -2,7 +2,7 @@
 # Date: 2021/1/29
 """Data wrangling configurations for X and y after train test split, output ready for fitting in model"""
 
-from typing import Tuple
+from typing import Tuple, Union
 from functools import partial
 
 import numpy as np
@@ -18,12 +18,14 @@ import consts as C
 def load_dataset(loader: MARSDataLoader,
                  config_id: int,
                  test_split=False,
-                 seq_label=False) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+                 seq_label=False,
+                 return_indices=False) -> Union[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+                                           Tuple[np.ndarray, np.ndarray, np.ndarray]]:
     """
     load X matrix and y matrix with given config number.
     :param loader: loader to retrieve columns from
     :param config_id: ID for configuration to use
-    :return: X and y, from train or test split
+    :return: X, y, and episode id (and split indices if specified) from train or test split
     """
     # ### Load features and labels in specified configuration ID
     # load config function (maybe partially filled)
@@ -56,7 +58,10 @@ def load_dataset(loader: MARSDataLoader,
         # otherwise, return data for CV
         inds = loader.retrieve_inds(get_train_split=True)
 
-    return X_all[inds], y_all[inds], epi_ids[inds]
+    if return_indices:
+        return X_all[inds], y_all[inds], epi_ids[inds], inds
+    else:
+        return X_all[inds], y_all[inds], epi_ids[inds]
 
 
 

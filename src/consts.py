@@ -175,7 +175,8 @@ CV_OPTIONS = [NO_CV, KFOLD, LEAVE_OUT]
 
 
 # experiment path
-EXP_FORMAT = os.path.join(EXP_PATH, "exp{}_{}win_{}ahead_conf{}_{}")  # e.g.exp1_1000win_500scale_conf1_lstm"
+EXP_PREF_PATTERN = "exp{}_"
+EXP_FORMAT = os.path.join(EXP_PATH, EXP_PREF_PATTERN + "{}win_{}ahead_conf{}_{}")  # e.g.exp1_1000win_500scale_conf1_lstm"
 
 # experiment directory path for each experiment
 RESULT_DIR = "results"
@@ -218,7 +219,7 @@ EXP_COL_CONV = OrderedDict([('exp_ID', 'experiment ID'),
 # name of stray columns not from namespace
 CONFIG_DESC_COL_NAME = "dataset config desc"
 
-# results .csv values
+# results .csv values for validation data
 PERF_METRIC = 'auc_sklearn'
 RES_COLS = ['auc_tf', 'auc_sklearn', 'precision', 'recall', 'f1',
             'accuracy', 'tn', 'fp', 'fn', 'tp', 'total'] + ALL_PATR
@@ -253,4 +254,6 @@ PRED_ID_COL = "prediction ID"
 PRED_ID_RECORD = os.path.join(RESULT_DIR, ".predIDs")
 PRED_RES_CSV_PATH = os.path.join(RESULT_DIR, "heldout_pred_res.csv")
 TEMPLATE_PRED_RES = os.path.join(RESULT_DIR, "template", "heldout_pred_res.csv")
-HELDOUT_PRED_PATH = os.path.join(RESULT_DIR, "heldoutPred_predID{}_{}win_{}trainahead_{}testahead.npz")
+HELDOUT_PRED_NPZ_PATH = os.path.join(RESULT_DIR, "{}heldoutPred_expID{}_{}DecThresh_{}win_{}trainahead_{}testahead.npz")
+HELDOUT_TRUE_PRED_PATH = os.path.join(RESULT_DIR, "{}heldoutPred_expID{}_{}DecThresh_TruePreds_{}win_{}trainahead_{}testahead.csv")
+HELDOUT_FALSE_PRED_PATH = os.path.join(RESULT_DIR, "{}heldoutPred_expID{}_{}DecThresh_FalsePreds_{}win_{}trainahead_{}testahead.csv")

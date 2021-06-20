@@ -219,7 +219,7 @@ def train_one_split(args: argparse.Namespace,
     y_pred[y_pred < args.threshold] = 0
 
     y_pred, y_test = y_pred.astype(np.uint8), y_test.astype(np.uint8)
-    results = compute_test_results(y_pred, y_test, y_pred_proba, eval_res)
+    results = compute_train_eval_results(y_pred, y_test, y_pred_proba, eval_res)
 
     # print test set results:
     if not args.silent:
@@ -301,7 +301,7 @@ def match_and_build_model(args, X_train: np.ndarray, using_seq_label: bool)->tf.
     return model
 
 
-def compute_test_results(y_pred, y_true, y_proba, eval_res):
+def compute_train_eval_results(y_pred, y_true, y_proba, eval_res):
     """helper function to compute and return dictionary containing all results"""
 
     tn, fp, fn, tp = confusion_matrix(y_true.flatten(), y_pred.flatten()).ravel()
