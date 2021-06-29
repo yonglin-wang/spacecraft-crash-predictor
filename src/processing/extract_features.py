@@ -129,11 +129,13 @@ def save_col(col_array: Union[list, np.ndarray],
         np.save(os.path.join(out_dir, C.COL_PATHS[col_name]), col_array)
 
 
-def extract_destabilize(feature_matrix: np.ndarray) -> np.ndarray:
+def extract_destabilize(feature_matrix: np.ndarray, single_entry=False) -> np.ndarray:
     """
     generate destabilization column based on the base feature matrix of (sampling_rate, 3).
     Destabilizing is defined as all 3 basic features 1) are non zero and 2) have same direction (i.e. sign)
     :param feature_matrix: feature matrix of original (velocity, position, joystick) tuple
+    :param single_entry: whether the feature matrix is single entry, of shape (sampling_rate, 3), or multi entry,
+    of shape (sample_size, sampling_rate, 3)
     :return: a (sampling_rate, 1) column of boolean, indicating if row is destabilizing
     """
     # get signs of each element in matrix (0 will get nan).
@@ -141,15 +143,22 @@ def extract_destabilize(feature_matrix: np.ndarray) -> np.ndarray:
     with np.errstate(divide="ignore", invalid="ignore"):
         signs = feature_matrix / np.abs(feature_matrix)
 
-    # get booleans of whether all columns have same sign value as 1st (i.e. all same sign)
-    # same_sign shape: (sample_size, sampling_rate, 3)
-    same_sign = np.equal(signs, signs[:, :, 0:1])
-
-    # sum up booleans, only destabilizing when all 3 columns in a row are true (i.e. row sums to 3)
-    num_feats = feature_matrix.shape[2]
-
-    # return shape: (sample_size, sampling_rate)
-    return np.equal(same_sign.sum(axis=2), num_feats)
+    if single_entry:
+        # get booleans of whether all columns have same sign value as 1st (i.e. all same sign)
+        # same_sign shape: (sampling_rate, 3)
+        same_sign = np.equal(signs, signs[:, 0:1])
+        # sum up booleans, only destabilizing when all 3 columns in a row are true (i.e. row sums to 3)
+        num_feats = feature_matrix.shape[1]
+        # return shape: (sampling_rate,)
+        return np.equal(same_sign.sum(axis=1), num_feats)
+    else:
+        # get booleans of whether all columns have same sign value as 1st (i.e. all same sign)
+        # same_sign shape: (sample_size, sampling_rate, 3)
+        same_sign = np.equal(signs, signs[:, :, 0:1])
+        # sum up booleans, only destabilizing when all 3 columns in a row are true (i.e. row sums to 3)
+        num_feats = feature_matrix.shape[2]
+        # return shape: (sample_size, sampling_rate)
+        return np.equal(same_sign.sum(axis=2), num_feats)
 
 
 def _process_window(output_arrays: dict, entries_for_inter, trial_key: str,
@@ -416,4 +425,4 @@ def broadcast_to_sampled(arr: np.ndarray, arr_sampled: np.ndarray) -> np.ndarray
 
 if __name__ == "__main__":
     # why 2000 below ends up with "KeyError: '1_as_P31/01_600back_Block1_trial_001.csv'"???
-    exp_len = generate_feature_files(2.0, 1.0, 50, 3.0, 0.1, "data/2000window_1000ahead_100rolling", show_pbar=True)
+    exp_len = generate_feature_files(1.0, 1.0, 50, 3.0, 0.1, "data/1000window_1000ahead_100rolling", show_pbar=True)

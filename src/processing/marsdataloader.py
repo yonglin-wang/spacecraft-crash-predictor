@@ -255,5 +255,5 @@ def __rename_used_cols(df, train_cols: list):
 
 if __name__ == "__main__":
     from processing.dataset_config import load_dataset
-    loader = MARSDataLoader(window_size=0.3, time_ahead=0.5, rolling_step=0.1, verbose=True)
+    loader = MARSDataLoader(window_size=2, time_ahead=1, rolling_step=0.1, verbose=True)
 

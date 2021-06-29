@@ -136,7 +136,7 @@ def _save_test_predictions(pred_id: int,
                            y_proba: np.ndarray,
                            y_pred: np.ndarray,
                            recorder: Recorder,
-                           test_ahead: int,
+                           test_ahead: float,
                            threshold: float,
                            test_inds: np.ndarray,
                            save_npz: bool=False,
@@ -176,7 +176,7 @@ def _save_test_predictions(pred_id: int,
                                                    recorder.train_args["ahead"] * 1000,
                                                    test_ahead * 1000)
     if save_csv:
-        recorder.save_predictions(test_inds, y_pred, true_preds_path=true_path, false_preds_path=false_path)
+        recorder.save_predictions(test_inds, y_pred, true_preds_path=true_path, false_preds_path=false_path, custom_ahead=test_ahead)
 
 
 def _infer_decision_threshold(y_proba: np.ndarray,

@@ -3,8 +3,9 @@
 # Author: Yonglin Wang
 # Date: 2021/1/31 9:47 PM
 """
-Lightweight class to record training and dataset file info for later retrieval
-Experiment ID is generated from the exp_ID_config.csv file; 1 if file not exist
+Lightweight class to record training and dataset file info for later retrieval.
+Experiment ID is generated from the exp_ID_config.csv file; 1 if file not exist.
+Also includes data FalsePositiveCategorizer class for categorizing false negatives and false positives
 """
 
 import math
@@ -19,8 +20,10 @@ from tensorflow.keras import Sequential
 from tensorflow.keras.models import load_model
 from tensorflow.keras.callbacks import History
 import numpy as np
+from tqdm import tqdm
 
 from processing.marsdataloader import MARSDataLoader, generate_all_feat_df
+from processing.extract_features import extract_destabilize
 import consts as C
 
 
@@ -115,7 +118,8 @@ class Recorder():
                          test_inds: Union[list, np.ndarray],
                          y_pred: Union[list, np.ndarray],
                          true_preds_path: str="",
-                         false_preds_path: str="") -> None:
+                         false_preds_path: str="",
+                         custom_ahead: float=None) -> None:
         """save prediction for specified rows; separate files will be generated if no sequence label used and true and
         false pred paths are given."""
         # generate test DataFrame
@@ -145,9 +149,16 @@ class Recorder():
         if true_preds_path and false_preds_path and not self.using_seq_label:
             pred_label_is_correct = test_df.apply(lambda row: np.array_equal(row.label, row[C.PRED_COL]), axis=1)
             grouped = test_df.groupby(pred_label_is_correct)
+
             # find respective rows and save separately
             true_df = grouped.get_group(True)
             false_df = grouped.get_group(False)
+
+            # categorize false negatives for non-sequential labels
+            if not self.using_seq_label:
+                print("now generating false prediction categories...")
+                false_df = append_false_categories(false_df, self, custom_ahead)
+
             true_df.to_csv(true_preds_path)
             print(f"saved {len(true_df)} true/correct predictions to {true_preds_path}")
             false_df.to_csv(false_preds_path)
@@ -158,6 +169,9 @@ class Recorder():
 
         if self.verbose:
             print("Model test set input and prediction saved successfully!")
+
+    def list_training_columns(self) -> list:
+        return C.CONFIG_SPECS[self.configID][C.COLS_USED]
 
     def __save_model(self, model) -> None:
         """helper to save models"""
@@ -233,19 +247,6 @@ class Recorder():
 
         return output
 
-    # def predict_with_model(self, X_input: np.ndarray) -> np.ndarray:
-    #     """return y probabilities given data with model saved at model_path"""
-    #     assert os.path.exists(self.model_path), "No model saved at {}".format(self.model_path)
-    #
-    #     model = load_model(self.model_path)
-    #
-    #     # compare only non sample size shapes
-    #     assert model.input_shape[1:] == X_input.shape[1:], \
-    #         "2nd & 3rd dimensions of input ({}) do not align with model input shape ({}).".format(str(model.input_shape[1:]),
-    #                                                                                  str(X_input.shape[1:]))
-    #
-    #     return model.generate_model_prediction(X_input)
-
 
 def _find_next_exp_ID() -> int:
     """helper to find the next unique exp ID in given exp dir, fast operation to avoid collision"""
@@ -272,26 +273,75 @@ def _filter_values(vars_dict: dict)->dict:
     return output
 
 
-if __name__ == "__main__":
-    # for debugging only
-    train_dict = {'window': 0.3,
-                  'ahead': 0.5,
-                  'rolling': 0.7,
-                  'rate': 50,
-                  'gap': 0.8,
-                  'configID': 1,
-                  'cal_vel': False,
-                  'early_stop': False,
-                  'patience': 3,
-                  'conv_crit': 'loss',
-                  'silent': False,
-                  'pbar': False,
-                  'no_preds': True,
-                  'model': 'lstm',
-                  'crash_ratio': 1,
-                  'notes': 'n/a'}
+class FalsePredictionCategorizer:
+    def __init__(self,
+                 recorder: Recorder,
+                 current_ahead: float
+                 ):
+        if not os.path.exists(C.RAW_DATA_PATH):
+            raise FileNotFoundError("Raw data file cannot be found at {}".format(C.RAW_DATA_PATH))
+        # extract all needed columns
+        self.raw_data = pd.read_csv(C.RAW_DATA_PATH, usecols=C.ESSENTIAL_RAW_COLS)
+        # filter out non-human controls in data for faster processing
+        self.raw_data = self.raw_data[self.raw_data.trialPhase != 1]
+        # group by trials for easy locating
+        self.grouped = self.raw_data.groupby('peopleTrialKey')
+        # get data from recorder
+        self.window_size = recorder.loader.window
+        self.lookahead = current_ahead
+        self.velocity_col = "calculated_vel" if "velocity_cal" in recorder.list_training_columns() else "currentVelRoll"
 
-    loader = MARSDataLoader(window_size=0.3, time_ahead=0.5)
-    recorder = Recorder(loader, train_dict)
-    print("recroder stats: ")
-    print(vars(recorder))
+    def generate_false_categories(self, false_df: pd.DataFrame) -> list:
+        """append a new column containing the categories of the false predictions,
+        including type A, B1, B2 (mutually exclusive)"""
+        # apply categorization function to each data point to assign error type
+        false_categories = []
+        for _, row in false_df.iterrows():
+            false_categories.append(self._categorize_false_pred_entry(float(row.start_seconds),
+                                                                float(row.end_seconds),
+                                                                self.grouped.get_group(row.trial_key)))
+        return false_categories
+
+    def _categorize_false_pred_entry(self, start_sec: float, end_sec: float, trial_entries: pd.DataFrame) -> str:
+        """for a single entry, return corresponding category"""
+        # case A: destabilizing joystick deflection occur during lookahead
+        # locate lookahead sequences
+        lookahead_readings = trial_entries[trial_entries.seconds.between(end_sec, end_sec + self.lookahead)]
+        # see if deflection occurs
+        base_triples = lookahead_readings[[self.velocity_col, 'currentPosRoll', 'joystickX']].to_numpy()
+        # get an array of whether each reading in lookahead is destabilizing
+        has_deflections = extract_destabilize(base_triples, single_entry=True)
+        if np.any(has_deflections):
+            return "A"
+
+        # case B1: not A, but have an angular position higher than the limit
+        window_readings = trial_entries[trial_entries.seconds.between(start_sec, start_sec + self.window_size)]
+        is_greater_than_pos_limit = window_readings['currentPosRoll'] > C.CASE_B_POS_LIMIT
+        if np.any(is_greater_than_pos_limit):
+            return "B1"
+        else:
+            # case B2: not A nor B1
+            return "B2"
+
+
+def append_false_categories(false_df: pd.DataFrame,
+                            recorder: Recorder,
+                            current_ahead: float=None) -> pd.DataFrame:
+    """append false prediction categories to given false DataFrame"""
+    if not current_ahead:
+        current_ahead = recorder.loader.ahead
+
+    categorizer = FalsePredictionCategorizer(recorder, current_ahead)
+    false_categories = categorizer.generate_false_categories(false_df)
+
+    new_appended_false_df = false_df.assign(false_pred_category=false_categories)
+    return new_appended_false_df
+
+
+if __name__ == "__main__":
+    # debugging categorization function
+    import pickle
+    test_curr_ahead = 1.0
+    test_false_df = pd.read_csv("local/test_false_df.csv")
+    test_recorder = pickle.load(open("local/test_recorder.pkl", "rb"))
+    new_df = append_false_categories(test_false_df, test_recorder, test_curr_ahead)

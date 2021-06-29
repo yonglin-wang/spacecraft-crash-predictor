@@ -90,7 +90,8 @@ CONFIG_IDS = {1, 2, 3}
 VAL_SIZE = 0.1
 
 # for marking columns used in training in the output prediction file
-USED_COL_FORMAT = "{}_InTrain"
+USED_COL_SUFFIX = "_InTrain"
+USED_COL_FORMAT = "{}" + USED_COL_SUFFIX
 
 # configuration specific details
 COLS_USED = "cols_used"
@@ -257,3 +258,9 @@ TEMPLATE_PRED_RES = os.path.join(RESULT_DIR, "template", "heldout_pred_res.csv")
 HELDOUT_PRED_NPZ_PATH = os.path.join(RESULT_DIR, "{}heldoutPred_expID{}_{}DecThresh_{}win_{}trainahead_{}testahead.npz")
 HELDOUT_TRUE_PRED_PATH = os.path.join(RESULT_DIR, "{}heldoutPred_expID{}_{}DecThresh_TruePreds_{}win_{}trainahead_{}testahead.csv")
 HELDOUT_FALSE_PRED_PATH = os.path.join(RESULT_DIR, "{}heldoutPred_expID{}_{}DecThresh_FalsePreds_{}win_{}trainahead_{}testahead.csv")
+
+
+# -----
+# Error Analysis Constants
+# -----
+CASE_B_POS_LIMIT = 40
