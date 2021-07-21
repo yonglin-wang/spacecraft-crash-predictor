@@ -27,16 +27,16 @@ These are the exact steps I used to install the exact versions listed above:
 
 2. Install anaconda python 3.8 if not already
 
-   ```
-   $ conda install -c anaconda python=3.8
+   ```shell script
+   conda install -c anaconda python=3.8
    ```
 
 3. Install the packages listed above in the given order:
 
-   ```
-   $ pip install tensorflow==2.2.0
-   $ pip install keras==2.4.3
-   $ pip install numpy==1.19.2
+   ```shell script
+   pip install tensorflow==2.2.0
+   pip install keras==2.4.3
+   pip install numpy==1.19.2
    ```
 
 ## Dataset Requirement
@@ -51,26 +51,30 @@ Under project root, run ```$ ./src/experiment.py -h``` to see all available argu
 
 - Example 1: running the all default options
 
-  ```
-  $ ./src/experiment.py
+  ```shell script
+  ./src/experiment.py
   ```
 
-- Example 2: template for tweaking most of the parameters
+- Example 2: template for tweaking most of the parameters; note that the last 3 lines are usually held the same during the experiments, and the last 2 lines are default values that can be left out of the arguments.
 
-  ```
-  $ ./src/experiment.py --window 2.0 --ahead 1.0 --rolling 0.7 --configID 1 --early_stop \
-  						   --model gru --crash_ratio 1 --dropout 0.5 --hidden_dim 100 \
-  						   --batch_size 256 --notes "initial test run, diff in window, gru"
+  ```shell script
+  ./src/experiment.py --window 1.0 --ahead 0.8 --rolling 0.2 \
+                      --model gru --normalize all --crash_ratio 1 --configID 3 \
+                      --notes "gru-def: +destablize, +norm all, gru save_model" \
+                      --early_stop --save_model \
+                      --patience 3 --cv_splits 10 --cv_mode kfold \
+                      --batch_size 256 --dropout 0.5 --hidden_dim 100 --threshold 0.5 --max_epoch 50
+                      
   ```
 
 - Example 3: if working on an interactive shell, add ```--pbar``` to show progress bar
 
-  ```
-  $ ./src/experiment.py --pbar <other arguments>
+  ```shell script
+  ./src/experiment.py --pbar <other arguments>
   ```
 
 # Evaluate Saved Model on Held-out Test Sets
-With [predict.py](src/predict.py), the model obtained from running [expeirment.py](src/experiment.py) above can be evaluated on test sets from datasets, potentially with a different look ahead time. 
+With [predict.py](src/predict.py), the model obtained from running [experiment.py](src/experiment.py) above can be evaluated on test sets from datasets, potentially with a different look ahead time. 
 
 ## What you'll need
 Before running [predict.py](src/predict.py), you'll need to have run at least 1 experiment where you've saved a model. In this way, the script can read the training record and saved model under [exp/](exp) folder. 
@@ -78,14 +82,20 @@ Before running [predict.py](src/predict.py), you'll need to have run at least 1 
 You'll need to specify the id of the experiment (found under ```Experiment ID``` column in ```results/exp_ID_config.csv```). By default, if no ```--ahead``` time is specified, the model will evaluate on the original dataset (which mean the original time ahead).
 
 ## Example
-For example, if we want to evaluate the model saved from Experiment 206 (i.e. ```Experiment ID```=206), use
+For example, if we want to evaluate the model saved from Experiment 206 (i.e. ```Experiment ID```=206) and save the held-out test set predictions as csv files, use
 
-```
-$ .src/predict.py 206
+```shell script
+./src/predict.py 206 --save_preds_csv
 ```
 
-If you'd like to evaluate the model from Experiment 206 on a test set of a different time ahead, e.g. 0.7s (700ms) ahead, specify that time with:
+To evaluate the models at a different recall such as 0.99 (i.e. evaluate with the decision threshold that yields 0.99 recall), use
+
+```shell script
+./src/predict.py 206 --save_preds_csv --at_recall 0.99
 ```
+
+If you'd like to evaluate the model from Experiment 206 on a test set of a different time ahead for testing model rigidity, e.g. 0.7s (700ms) ahead, specify that time with:
+```shell script
 $ .src/predict.py 206 --ahead 0.7
 ```
 Note that if the dataset with the new time ahead does not exist, the program will automatically generate the dataset before evaluating the model.
@@ -96,7 +106,9 @@ Note that if the dataset with the new time ahead does not exist, the program wil
 
 Under [results/](results/), ```experiment.py``` script automatically saves the the experiment configuration (in ```exp_ID_config.csv```) and result metrics (in ```exp_results_all.csv```). If these files don't exist upon recording, they will be created from the templates in ```./reasults/template```. 
 
-Each experiment will be indexed with a unique ID number. The two tables can be joined on their first columns, i.e. on ```experiment ID``` or ```exp_ID```. ```exp_ID_config.csv``` contains configuration information such as:
+Each experiment will be indexed with a unique ID number. The two tables can be joined on their first columns, i.e. on ```experiment ID``` or ```exp_ID```. See below section for automatically joining the tables. 
+
+```exp_ID_config.csv``` contains configuration information such as:
 
 - preprocessing configurations (e.g. window size, time ahead, rolling step, etc.)
 - model configurations (e.g. input data configuration, model type, model hyperparameters, batch size, etc.)

@@ -263,4 +263,3 @@ HELDOUT_FALSE_PRED_PATH = os.path.join(RESULT_DIR, "{}heldoutPred_expID{}_{}DecT
 # -----
 # Error Analysis Constants
 # -----
-CASE_B_POS_LIMIT = 40

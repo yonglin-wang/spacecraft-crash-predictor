@@ -148,20 +148,21 @@ class Recorder():
         # save correct and incorrect predictions separately if both paths are given; otherwise, save in one file
         if true_preds_path and false_preds_path and not self.using_seq_label:
             pred_label_is_correct = test_df.apply(lambda row: np.array_equal(row.label, row[C.PRED_COL]), axis=1)
+
+            # categorize false negatives for non-sequential labels
+            if not self.using_seq_label:
+                print("now finding destab joystick in lookahead windows...")
+                test_df = append_categories(test_df, self, custom_ahead)
+
             grouped = test_df.groupby(pred_label_is_correct)
 
             # find respective rows and save separately
             true_df = grouped.get_group(True)
             false_df = grouped.get_group(False)
 
-            # categorize false negatives for non-sequential labels
-            if not self.using_seq_label:
-                print("now generating false prediction categories...")
-                false_df = append_false_categories(false_df, self, custom_ahead)
-
-            true_df.to_csv(true_preds_path)
+            true_df.to_csv(true_preds_path, index=False)
             print(f"saved {len(true_df)} true/correct predictions to {true_preds_path}")
-            false_df.to_csv(false_preds_path)
+            false_df.to_csv(false_preds_path, index=False)
             print(f"saved {len(false_df)} true/correct predictions to {false_preds_path}")
             print(f"accuracy (for debugging): {len(true_df)/(len(true_df) + len(false_df))}")
         else:
@@ -273,7 +274,7 @@ def _filter_values(vars_dict: dict)->dict:
     return output
 
 
-class FalsePredictionCategorizer:
+class EntryCategorizer:
     def __init__(self,
                  recorder: Recorder,
                  current_ahead: float
@@ -291,51 +292,39 @@ class FalsePredictionCategorizer:
         self.lookahead = current_ahead
         self.velocity_col = "calculated_vel" if "velocity_cal" in recorder.list_training_columns() else "currentVelRoll"
 
-    def generate_false_categories(self, false_df: pd.DataFrame) -> list:
+    def generate_categories(self, data_df: pd.DataFrame) -> list:
         """append a new column containing the categories of the false predictions,
         including type A, B1, B2 (mutually exclusive)"""
         # apply categorization function to each data point to assign error type
-        false_categories = []
-        for _, row in false_df.iterrows():
-            false_categories.append(self._categorize_false_pred_entry(float(row.start_seconds),
-                                                                float(row.end_seconds),
-                                                                self.grouped.get_group(row.trial_key)))
-        return false_categories
+        categories_column_data = []
+        for _, row in data_df.iterrows():
+            categories_column_data.append(self._append_has_destab_in_lookahead(float(row.end_seconds),
+                                                                         self.grouped.get_group(row.trial_key)))
+        return categories_column_data
 
-    def _categorize_false_pred_entry(self, start_sec: float, end_sec: float, trial_entries: pd.DataFrame) -> str:
-        """for a single entry, return corresponding category"""
-        # case A: destabilizing joystick deflection occur during lookahead
+    def _append_has_destab_in_lookahead(self, end_sec: float, trial_entries: pd.DataFrame) -> bool:
+        """for a single entry, return whether there is destablizing joystick deflection in the lookahead window"""
         # locate lookahead sequences
         lookahead_readings = trial_entries[trial_entries.seconds.between(end_sec, end_sec + self.lookahead)]
         # see if deflection occurs
         base_triples = lookahead_readings[[self.velocity_col, 'currentPosRoll', 'joystickX']].to_numpy()
         # get an array of whether each reading in lookahead is destabilizing
         has_deflections = extract_destabilize(base_triples, single_entry=True)
-        if np.any(has_deflections):
-            return "A"
-
-        # case B1: not A, but have an angular position higher than the limit
-        window_readings = trial_entries[trial_entries.seconds.between(start_sec, start_sec + self.window_size)]
-        is_greater_than_pos_limit = window_readings['currentPosRoll'] > C.CASE_B_POS_LIMIT
-        if np.any(is_greater_than_pos_limit):
-            return "B1"
-        else:
-            # case B2: not A nor B1
-            return "B2"
+        return np.any(has_deflections)
 
 
-def append_false_categories(false_df: pd.DataFrame,
-                            recorder: Recorder,
-                            current_ahead: float=None) -> pd.DataFrame:
-    """append false prediction categories to given false DataFrame"""
+def append_categories(dataset_df: pd.DataFrame,
+                      recorder: Recorder,
+                      current_ahead: float=None) -> pd.DataFrame:
+    """append prediction categories to given test set DataFrame"""
     if not current_ahead:
         current_ahead = recorder.loader.ahead
 
-    categorizer = FalsePredictionCategorizer(recorder, current_ahead)
-    false_categories = categorizer.generate_false_categories(false_df)
+    categorizer = EntryCategorizer(recorder, current_ahead)
+    categories_column_data = categorizer.generate_categories(dataset_df)
 
-    new_appended_false_df = false_df.assign(false_pred_category=false_categories)
-    return new_appended_false_df
+    new_appended_df = dataset_df.assign(pred_category=categories_column_data)
+    return new_appended_df
 
 
 if __name__ == "__main__":
@@ -344,4 +333,4 @@ if __name__ == "__main__":
     test_curr_ahead = 1.0
     test_false_df = pd.read_csv("local/test_false_df.csv")
     test_recorder = pickle.load(open("local/test_recorder.pkl", "rb"))
-    new_df = append_false_categories(test_false_df, test_recorder, test_curr_ahead)
+    new_df = append_categories(test_false_df, test_recorder, test_curr_ahead)
