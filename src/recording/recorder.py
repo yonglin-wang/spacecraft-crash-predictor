@@ -145,7 +145,7 @@ class Recorder():
 
             # categorize false negatives for non-sequential labels
             if not self.using_seq_label:
-                print("now finding destab joystick in lookahead windows...")
+                print("now processing destab joystick in lookahead windows...")
                 test_df = append_categories(test_df, self, custom_ahead)
 
             grouped = test_df.groupby(pred_label_is_correct)
@@ -286,19 +286,23 @@ class EntryCategorizer:
         self.lookahead = current_ahead
         self.velocity_col = "calculated_vel" if "velocity_cal" in recorder.list_training_columns() else "currentVelRoll"
 
-    def generate_categories(self, data_df: pd.DataFrame) -> Tuple[List[float], List[float]]:
+    def generate_categories(self, data_df: pd.DataFrame) -> Tuple[List[float], List[float], List[int], List[int]]:
         """append a new column containing entry stats"""
         # apply categorization function to each data point to assign error type.
         # ico = including carryover destabilizing joystick from input window (ie seen by machine); eco = exclude such
         lookahead_avg_destab_mag_ico, lookahead_avg_destab_mag_eco = [], []
+        lookahead_total_destab_steps_ico, lookahead_total_destab_steps_eco = [], []
         for _, row in data_df.iterrows():
-            avg_destab_mag_ico, avg_destab_mag_eco = self._extract_lookahead_stats(float(row.end_seconds),
+            avg_destab_mag_ico, avg_destab_mag_eco, total_destab_steps_ico, total_destab_steps_eco = self._extract_lookahead_stats(float(row.end_seconds),
                                                                                  self.grouped.get_group(row.trial_key))
             lookahead_avg_destab_mag_ico.append(avg_destab_mag_ico)
             lookahead_avg_destab_mag_eco.append(avg_destab_mag_eco)
-        return lookahead_avg_destab_mag_ico, lookahead_avg_destab_mag_eco
+            lookahead_total_destab_steps_ico.append(total_destab_steps_ico)
+            lookahead_total_destab_steps_eco.append(total_destab_steps_eco)
+        return lookahead_avg_destab_mag_ico, lookahead_avg_destab_mag_eco, \
+               lookahead_total_destab_steps_ico, lookahead_total_destab_steps_eco
 
-    def _extract_lookahead_stats(self, end_sec: float, trial_entries: pd.DataFrame) -> Tuple[float, float]:
+    def _extract_lookahead_stats(self, end_sec: float, trial_entries: pd.DataFrame) -> Tuple[float, float, int, int]:
         """for a single entry, return its avg destabilizing joystick magnitude, w/ or w/o carryover destabilizing
         joystick, ie destab carried over from input window (i.e. "seen by machine", such as ...111 -> 1100);
         if no such destab, return NaN. If no lookahead window (i.e. for end-of-trial neg samples), return NaN """
@@ -346,7 +350,7 @@ class EntryCategorizer:
         avg_destab_magnitude_ico = destab_ico.dot(np.abs(joystick_ico)) / np.sum(destab_ico) if lookahead_has_destab_ico else np.nan
         avg_destab_magnitude_eco = destab_eco.dot(np.abs(joystick_eco)) / np.sum(destab_eco) if lookahead_has_destab_eco else np.nan
 
-        return avg_destab_magnitude_ico, avg_destab_magnitude_eco
+        return avg_destab_magnitude_ico, avg_destab_magnitude_eco, int(np.sum(destab_ico)), int(np.sum(destab_eco))
 
 
 def append_categories(dataset_df: pd.DataFrame,
@@ -357,10 +361,13 @@ def append_categories(dataset_df: pd.DataFrame,
         current_ahead = recorder.loader.ahead
 
     categorizer = EntryCategorizer(recorder, current_ahead)
-    lookahead_avg_destab_mag_ico,  lookahead_avg_destab_mag_eco= categorizer.generate_categories(dataset_df)
+    lookahead_avg_destab_mag_ico,  lookahead_avg_destab_mag_eco, \
+    lookahead_total_destab_steps_ico, lookahead_total_destab_steps_eco = categorizer.generate_categories(dataset_df)
 
     new_appended_df = dataset_df.assign(lookahead_avg_destab_mag_ico=lookahead_avg_destab_mag_ico,
-                                        lookahead_avg_destab_mag_eco=lookahead_avg_destab_mag_eco)
+                                        lookahead_avg_destab_mag_eco=lookahead_avg_destab_mag_eco,
+                                        lookahead_total_destab_steps_ico=lookahead_total_destab_steps_ico,
+                                        lookahead_total_destab_steps_eco=lookahead_total_destab_steps_eco)
     return new_appended_df
 
 
