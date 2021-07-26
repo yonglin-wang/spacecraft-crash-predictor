@@ -8,19 +8,13 @@ Experiment ID is generated from the exp_ID_config.csv file; 1 if file not exist.
 Also includes data FalsePositiveCategorizer class for categorizing false negatives and false positives
 """
 
-import math
 import os
-import pickle
-import subprocess
 from datetime import date
-from typing import Union, Dict
+from typing import Union, Dict, Tuple, List
 
 import pandas as pd
 from tensorflow.keras import Sequential
-from tensorflow.keras.models import load_model
-from tensorflow.keras.callbacks import History
 import numpy as np
-from tqdm import tqdm
 
 from processing.marsdataloader import MARSDataLoader, generate_all_feat_df
 from processing.extract_features import extract_destabilize
@@ -292,25 +286,67 @@ class EntryCategorizer:
         self.lookahead = current_ahead
         self.velocity_col = "calculated_vel" if "velocity_cal" in recorder.list_training_columns() else "currentVelRoll"
 
-    def generate_categories(self, data_df: pd.DataFrame) -> list:
-        """append a new column containing the categories of the false predictions,
-        including type A, B1, B2 (mutually exclusive)"""
-        # apply categorization function to each data point to assign error type
-        categories_column_data = []
+    def generate_categories(self, data_df: pd.DataFrame) -> Tuple[List[float], List[float]]:
+        """append a new column containing entry stats"""
+        # apply categorization function to each data point to assign error type.
+        # ico = including carryover destabilizing joystick from input window (ie seen by machine); eco = exclude such
+        lookahead_avg_destab_mag_ico, lookahead_avg_destab_mag_eco = [], []
         for _, row in data_df.iterrows():
-            categories_column_data.append(self._append_has_destab_in_lookahead(float(row.end_seconds),
-                                                                         self.grouped.get_group(row.trial_key)))
-        return categories_column_data
+            avg_destab_mag_ico, avg_destab_mag_eco = self._extract_lookahead_stats(float(row.end_seconds),
+                                                                                 self.grouped.get_group(row.trial_key))
+            lookahead_avg_destab_mag_ico.append(avg_destab_mag_ico)
+            lookahead_avg_destab_mag_eco.append(avg_destab_mag_eco)
+        return lookahead_avg_destab_mag_ico, lookahead_avg_destab_mag_eco
 
-    def _append_has_destab_in_lookahead(self, end_sec: float, trial_entries: pd.DataFrame) -> bool:
-        """for a single entry, return whether there is destablizing joystick deflection in the lookahead window"""
-        # locate lookahead sequences
-        lookahead_readings = trial_entries[trial_entries.seconds.between(end_sec, end_sec + self.lookahead)]
+    def _extract_lookahead_stats(self, end_sec: float, trial_entries: pd.DataFrame) -> Tuple[float, float]:
+        """for a single entry, return its avg destabilizing joystick magnitude, w/ or w/o carryover destabilizing
+        joystick, ie destab carried over from input window (i.e. "seen by machine", such as ...111 -> 1100);
+        if no such destab, return NaN. If no lookahead window (i.e. for end-of-trial neg samples), return NaN """
+
+        # locate lookahead sequences, note that first entry is last time step in input window
+        lookahead_readings = trial_entries[trial_entries.seconds.between(end_sec, end_sec + self.lookahead, inclusive="left")]
         # see if deflection occurs
         base_triples = lookahead_readings[[self.velocity_col, 'currentPosRoll', 'joystickX']].to_numpy()
-        # get an array of whether each reading in lookahead is destabilizing
+        # get an array of whether each reading in lookahead is destabilizing, (sampling_rate,)
         has_deflections = extract_destabilize(base_triples, single_entry=True)
-        return np.any(has_deflections)
+        last_in_window_is_destab = has_deflections[0]
+        destab_ico = has_deflections[1:]
+        joystick_ico = lookahead_readings.joystickX.to_numpy()[1:]
+        assert destab_ico.shape == joystick_ico.shape, f"shape diff: {destab_ico.shape} vs {joystick_ico.shape}"
+
+        # split lookahead destab into bool subarray chunks: 1110011000 -> 111 00 11 000
+        lookahead_destab_cutpoints = np.where(np.diff(destab_ico))[0] + 1
+        destab_chunks_ico = np.split(destab_ico, lookahead_destab_cutpoints)      # destab chunks incl potential carryover destab
+        joystick_chunks_ico = np.split(joystick_ico, lookahead_destab_cutpoints)  # corresponding joystick chunks incl potential carryover destab
+
+        # take out carryover if any
+        destab_chunks_eco = destab_chunks_ico.copy()    # destab chunks excl potential carryover destab
+        joystick_chunks_eco = joystick_chunks_ico.copy()
+
+        # note: end-of-trial neg samples do not have lookahead window
+        if destab_chunks_ico[0].shape[0] != 0 and destab_chunks_ico[0][0] == True:
+            if last_in_window_is_destab:
+                # if the first chunk is a carry over destab, pop it
+                destab_chunks_eco.pop(0)
+                joystick_chunks_eco.pop(0)
+
+        # piece the chunks back into one vector
+        assert len(destab_chunks_eco) == len(joystick_chunks_eco)
+        if not destab_chunks_eco:
+            # if chunk lists become empty after popping, assign empty arrays
+            destab_eco, joystick_eco = np.empty(0), np.empty(0)
+        else:
+            destab_eco, joystick_eco = np.hstack(destab_chunks_eco), np.hstack(joystick_chunks_eco)
+
+        lookahead_has_destab_ico = np.any(destab_ico)
+        lookahead_has_destab_eco = np.any(destab_eco)   # returns False if empty
+
+        # Average Absolute magnitude of destabilizing joystick deflections: (dot product)/(# of destab, ie sum)
+        # avg is NaN iff lookahead has no such destab segment
+        avg_destab_magnitude_ico = destab_ico.dot(np.abs(joystick_ico)) / np.sum(destab_ico) if lookahead_has_destab_ico else np.nan
+        avg_destab_magnitude_eco = destab_eco.dot(np.abs(joystick_eco)) / np.sum(destab_eco) if lookahead_has_destab_eco else np.nan
+
+        return avg_destab_magnitude_ico, avg_destab_magnitude_eco
 
 
 def append_categories(dataset_df: pd.DataFrame,
@@ -321,9 +357,10 @@ def append_categories(dataset_df: pd.DataFrame,
         current_ahead = recorder.loader.ahead
 
     categorizer = EntryCategorizer(recorder, current_ahead)
-    categories_column_data = categorizer.generate_categories(dataset_df)
+    lookahead_avg_destab_mag_ico,  lookahead_avg_destab_mag_eco= categorizer.generate_categories(dataset_df)
 
-    new_appended_df = dataset_df.assign(pred_category=categories_column_data)
+    new_appended_df = dataset_df.assign(lookahead_avg_destab_mag_ico=lookahead_avg_destab_mag_ico,
+                                        lookahead_avg_destab_mag_eco=lookahead_avg_destab_mag_eco)
     return new_appended_df
 
 
@@ -334,3 +371,4 @@ if __name__ == "__main__":
     test_false_df = pd.read_csv("local/test_false_df.csv")
     test_recorder = pickle.load(open("local/test_recorder.pkl", "rb"))
     new_df = append_categories(test_false_df, test_recorder, test_curr_ahead)
+    print("Done!")
