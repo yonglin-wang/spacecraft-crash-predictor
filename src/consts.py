@@ -144,9 +144,10 @@ CONV_MODE = {VAL_LOSS: "min",
 LSTM = "lstm"
 GRU = "gru"
 LSTM_LSTM = "lstm-lstm"
+GRU_GRU = "gru-gru"
 MLP = "mlp"
-AVAILABLE_MODELS = [LSTM, GRU, LSTM_LSTM]
-RNN_MODELS = [LSTM, GRU, LSTM_LSTM]
+AVAILABLE_MODELS = [LSTM, GRU, LSTM_LSTM, GRU_GRU]
+RNN_MODELS = [LSTM, GRU, LSTM_LSTM, GRU_GRU]
 
 # names for metrics
 AUC = "auc"

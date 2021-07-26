@@ -48,6 +48,16 @@ def build_keras_rnn(sampling_rate, feature_num, using_seq_label: bool,
             )
         )
         model_out.add(keras.layers.LSTM(rnn_out_dim), return_sequences=using_seq_label)
+    elif rnn_type == C.GRU_GRU:
+        # tutorial found here: https://machinelearningmastery.com/stacked-long-short-term-memory-networks/
+        model_out.add(
+            keras.layers.GRU(
+                rnn_out_dim,
+                return_sequences=True,
+                input_shape=[sampling_rate, feature_num]
+            )
+        )
+        model_out.add(keras.layers.GRU(rnn_out_dim), return_sequences=using_seq_label)
     else:
         raise NotImplementedError("RNN does not recognize {}".format(rnn_type))
 
