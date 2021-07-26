@@ -47,7 +47,7 @@ def build_keras_rnn(sampling_rate, feature_num, using_seq_label: bool,
                 input_shape=[sampling_rate, feature_num]
             )
         )
-        model_out.add(keras.layers.LSTM(rnn_out_dim), return_sequences=using_seq_label)
+        model_out.add(keras.layers.LSTM(rnn_out_dim, return_sequences=using_seq_label))
     elif rnn_type == C.GRU_GRU:
         # tutorial found here: https://machinelearningmastery.com/stacked-long-short-term-memory-networks/
         model_out.add(
@@ -57,7 +57,7 @@ def build_keras_rnn(sampling_rate, feature_num, using_seq_label: bool,
                 input_shape=[sampling_rate, feature_num]
             )
         )
-        model_out.add(keras.layers.GRU(rnn_out_dim), return_sequences=using_seq_label)
+        model_out.add(keras.layers.GRU(rnn_out_dim, return_sequences=using_seq_label))
     else:
         raise NotImplementedError("RNN does not recognize {}".format(rnn_type))
 
@@ -91,5 +91,8 @@ def build_keras_rnn(sampling_rate, feature_num, using_seq_label: bool,
 
 
 if __name__ == "__main__":
-    model = build_keras_rnn(50, 3, True)
+    model = build_keras_rnn(50, 3, False, rnn_type=C.GRU_GRU)
     model.summary()
+
+    model2 = build_keras_rnn(50, 3, False, rnn_type=C.GRU)
+    model2.summary()
