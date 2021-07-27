@@ -141,6 +141,7 @@ def _save_test_predictions(pred_id: int,
                            test_inds: np.ndarray,
                            save_npz: bool=False,
                            save_csv: bool=True,
+                           save_lookahead_windows: bool=False
                            ):
     """Save test set predictions (inputs, probabilities, predicted labels, true labels)"""
 
@@ -176,7 +177,9 @@ def _save_test_predictions(pred_id: int,
                                                    recorder.train_args["ahead"] * 1000,
                                                    test_ahead * 1000)
     if save_csv:
-        recorder.save_predictions(test_inds, y_pred, true_preds_path=true_path, false_preds_path=false_path, custom_ahead=test_ahead)
+        recorder.save_predictions(test_inds, y_pred, true_preds_path=true_path,
+                                  false_preds_path=false_path, custom_ahead=test_ahead,
+                                  save_lookahead_windows=save_lookahead_windows)
 
 
 def _infer_decision_threshold(y_proba: np.ndarray,
@@ -248,7 +251,7 @@ def run_prediction(args: argparse.Namespace):
     if args.save_preds_csv or args.save_preds_npz:
         # save the actual predictions for each data, if needed
         _save_test_predictions(pred_ID, X_test, y_test, y_proba, y_pred, exp_recorder, args.ahead, threshold, sample_inds,
-                               save_npz=args.save_preds_npz, save_csv=args.save_preds_csv)
+                               save_npz=args.save_preds_npz, save_csv=args.save_preds_csv, save_lookahead_windows=args.save_lookahead_windows)
 
 
 def compute_test_eval_results(y_pred, y_true, y_proba, eval_res):
@@ -311,6 +314,9 @@ def main():
     parser.add_argument(
         '--save_preds_csv', action='store_true',
         help='whether to save model predictions and input as csv files')
+    parser.add_argument(
+        '--save_lookahead_windows', action='store_true',
+        help='whether to save test set lookahead windows in preds output files; only effective if --save_preds_csv is selected.')
     parser.add_argument(
         '--save_preds_npz', action='store_true',
         help='whether to save model predictions (inputs, probabilities, predicted labels, true labels) on the test set as a npz file')

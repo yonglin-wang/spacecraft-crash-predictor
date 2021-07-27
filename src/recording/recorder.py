@@ -10,6 +10,7 @@ Also includes data FalsePositiveCategorizer class for categorizing false negativ
 
 import os
 from datetime import date
+import pickle
 from typing import Union, Dict, Tuple, List
 
 import pandas as pd
@@ -113,7 +114,8 @@ class Recorder():
                          y_pred: Union[list, np.ndarray],
                          true_preds_path: str="",
                          false_preds_path: str="",
-                         custom_ahead: float=None) -> None:
+                         custom_ahead: float=None,
+                         save_lookahead_windows=False) -> None:
         """save prediction for specified rows; separate files will be generated if no sequence label used and true and
         false pred paths are given."""
         # generate test DataFrame
@@ -146,7 +148,7 @@ class Recorder():
             # categorize false negatives for non-sequential labels
             if not self.using_seq_label:
                 print("now processing destab joystick in lookahead windows...")
-                test_df = append_categories(test_df, self, custom_ahead)
+                test_df = append_lookahead_stats(test_df, self, custom_ahead, save_lookahead_windows=save_lookahead_windows)
 
             grouped = test_df.groupby(pred_label_is_correct)
 
@@ -268,7 +270,7 @@ def _filter_values(vars_dict: dict)->dict:
     return output
 
 
-class EntryCategorizer:
+class TestSetProcessor:
     def __init__(self,
                  recorder: Recorder,
                  current_ahead: float
@@ -286,23 +288,53 @@ class EntryCategorizer:
         self.lookahead = current_ahead
         self.velocity_col = "calculated_vel" if "velocity_cal" in recorder.list_training_columns() else "currentVelRoll"
 
-    def generate_categories(self, data_df: pd.DataFrame) -> Tuple[List[float], List[float], List[int], List[int]]:
+    def generate_categories(self, data_df: pd.DataFrame) -> Tuple[List[float], List[float], List[int], List[int], List[float], List[float]]:
         """append a new column containing entry stats"""
         # apply categorization function to each data point to assign error type.
         # ico = including carryover destabilizing joystick from input window (ie seen by machine); eco = exclude such
         lookahead_avg_destab_mag_ico, lookahead_avg_destab_mag_eco = [], []
         lookahead_total_destab_steps_ico, lookahead_total_destab_steps_eco = [], []
+        lookahead_destab_sustained_ico, lookahead_destab_sustained_eco = [], []
         for _, row in data_df.iterrows():
-            avg_destab_mag_ico, avg_destab_mag_eco, total_destab_steps_ico, total_destab_steps_eco = self._extract_lookahead_stats(float(row.end_seconds),
+            avg_destab_mag_ico, avg_destab_mag_eco, \
+            total_destab_steps_ico, total_destab_steps_eco, \
+            destab_sustained_ico, destab_sustained_eco = self._extract_lookahead_stats(float(row.end_seconds),
                                                                                  self.grouped.get_group(row.trial_key))
             lookahead_avg_destab_mag_ico.append(avg_destab_mag_ico)
             lookahead_avg_destab_mag_eco.append(avg_destab_mag_eco)
             lookahead_total_destab_steps_ico.append(total_destab_steps_ico)
             lookahead_total_destab_steps_eco.append(total_destab_steps_eco)
+            lookahead_destab_sustained_ico.append(destab_sustained_ico)
+            lookahead_destab_sustained_eco.append(destab_sustained_eco)
         return lookahead_avg_destab_mag_ico, lookahead_avg_destab_mag_eco, \
-               lookahead_total_destab_steps_ico, lookahead_total_destab_steps_eco
+               lookahead_total_destab_steps_ico, lookahead_total_destab_steps_eco, \
+                lookahead_destab_sustained_ico, lookahead_destab_sustained_eco
 
-    def _extract_lookahead_stats(self, end_sec: float, trial_entries: pd.DataFrame) -> Tuple[float, float, int, int]:
+    def save_lookahead_windows(self, data_df: pd.DataFrame) -> pd.DataFrame:
+        """save lookahead windows of each entry in given DataFrame"""
+        # TODO where to put this? additional arg in predict.py?
+        # output: [trial key, window_end], vel, pos, joystick,
+        # locate lookahead sequences, note that first entry is last time step in input window
+        lookahead_df_dict = {key:[] for key in [# "trial_key", "window_end",
+                                                "lookahead_vel", "lookahead_pos", "lookahead_joy", "lookahead_times"]}
+        for _, row in data_df.iterrows():
+            end_sec = float(row.end_seconds)
+            trial_entries = self.grouped.get_group(row.trial_key)
+            lookahead_readings = trial_entries[
+                trial_entries.seconds.between(end_sec, end_sec + self.lookahead, inclusive="neither")]
+            # record data into df
+            # lookahead_df_dict["trial_key"].append(row.trial_key)
+            # lookahead_df_dict["window_end"].append(end_sec)
+            lookahead_df_dict["lookahead_vel"].append(lookahead_readings[self.velocity_col].to_numpy())
+            lookahead_df_dict["lookahead_pos"].append(lookahead_readings['currentPosRoll'].to_numpy())
+            lookahead_df_dict["lookahead_joy"].append(lookahead_readings['joystickX'].to_numpy())
+            lookahead_df_dict["lookahead_times"].append(lookahead_readings.seconds.to_numpy())
+
+        return data_df.assign(**lookahead_df_dict)
+
+
+    def _extract_lookahead_stats(self, end_sec: float,
+                                 trial_entries: pd.DataFrame) -> Tuple[float, float, int, int, float, float]:
         """for a single entry, return its avg destabilizing joystick magnitude, w/ or w/o carryover destabilizing
         joystick, ie destab carried over from input window (i.e. "seen by machine", such as ...111 -> 1100);
         if no such destab, return NaN. If no lookahead window (i.e. for end-of-trial neg samples), return NaN """
@@ -318,14 +350,19 @@ class EntryCategorizer:
         joystick_ico = lookahead_readings.joystickX.to_numpy()[1:]
         assert destab_ico.shape == joystick_ico.shape, f"shape diff: {destab_ico.shape} vs {joystick_ico.shape}"
 
+        # time points for calculating length sustained
+        timepoints_ico = lookahead_readings.seconds.to_numpy()[1:]
+
         # split lookahead destab into bool subarray chunks: 1110011000 -> 111 00 11 000
         lookahead_destab_cutpoints = np.where(np.diff(destab_ico))[0] + 1
         destab_chunks_ico = np.split(destab_ico, lookahead_destab_cutpoints)      # destab chunks incl potential carryover destab
         joystick_chunks_ico = np.split(joystick_ico, lookahead_destab_cutpoints)  # corresponding joystick chunks incl potential carryover destab
+        timepoints_chunks_ico = np.split(timepoints_ico, lookahead_destab_cutpoints)
 
         # take out carryover if any
         destab_chunks_eco = destab_chunks_ico.copy()    # destab chunks excl potential carryover destab
         joystick_chunks_eco = joystick_chunks_ico.copy()
+        timepoints_chunks_eco = timepoints_chunks_ico.copy()
 
         # note: end-of-trial neg samples do not have lookahead window
         if destab_chunks_ico[0].shape[0] != 0 and destab_chunks_ico[0][0] == True:
@@ -333,6 +370,7 @@ class EntryCategorizer:
                 # if the first chunk is a carry over destab, pop it
                 destab_chunks_eco.pop(0)
                 joystick_chunks_eco.pop(0)
+                timepoints_chunks_eco.pop(0)
 
         # piece the chunks back into one vector
         assert len(destab_chunks_eco) == len(joystick_chunks_eco)
@@ -341,7 +379,6 @@ class EntryCategorizer:
             destab_eco, joystick_eco = np.empty(0), np.empty(0)
         else:
             destab_eco, joystick_eco = np.hstack(destab_chunks_eco), np.hstack(joystick_chunks_eco)
-
         lookahead_has_destab_ico = np.any(destab_ico)
         lookahead_has_destab_eco = np.any(destab_eco)   # returns False if empty
 
@@ -350,32 +387,49 @@ class EntryCategorizer:
         avg_destab_magnitude_ico = destab_ico.dot(np.abs(joystick_ico)) / np.sum(destab_ico) if lookahead_has_destab_ico else np.nan
         avg_destab_magnitude_eco = destab_eco.dot(np.abs(joystick_eco)) / np.sum(destab_eco) if lookahead_has_destab_eco else np.nan
 
-        return avg_destab_magnitude_ico, avg_destab_magnitude_eco, int(np.sum(destab_ico)), int(np.sum(destab_eco))
+        # add up time diffs
+        destab_sustained_ico, destab_sustained_eco = 0, 0
+        for destab_chunk, time_chunk in zip(destab_chunks_ico, timepoints_chunks_ico):
+            if destab_chunk.size > 0 and destab_chunk[0] == True:
+                destab_sustained_ico += time_chunk[-1] - time_chunk[0]
+        for destab_chunk, time_chunk in zip(destab_chunks_eco, timepoints_chunks_eco):
+            if destab_chunk.size > 0 and destab_chunk[0] == True:
+                destab_sustained_eco += time_chunk[-1] - time_chunk[0]
+
+        return avg_destab_magnitude_ico, avg_destab_magnitude_eco, \
+               int(np.sum(destab_ico)), int(np.sum(destab_eco)), \
+               destab_sustained_ico, destab_sustained_eco
 
 
-def append_categories(dataset_df: pd.DataFrame,
-                      recorder: Recorder,
-                      current_ahead: float=None) -> pd.DataFrame:
+def append_lookahead_stats(dataset_df: pd.DataFrame,
+                           recorder: Recorder,
+                           current_ahead: float=None,
+                           save_lookahead_windows=False) -> pd.DataFrame:
     """append prediction categories to given test set DataFrame"""
     if not current_ahead:
         current_ahead = recorder.loader.ahead
 
-    categorizer = EntryCategorizer(recorder, current_ahead)
+    prc = TestSetProcessor(recorder, current_ahead)
     lookahead_avg_destab_mag_ico,  lookahead_avg_destab_mag_eco, \
-    lookahead_total_destab_steps_ico, lookahead_total_destab_steps_eco = categorizer.generate_categories(dataset_df)
+    lookahead_total_destab_steps_ico, lookahead_total_destab_steps_eco,\
+        lookahead_destab_sustained_ico, lookahead_destab_sustained_eco = prc.generate_categories(dataset_df)
 
     new_appended_df = dataset_df.assign(lookahead_avg_destab_mag_ico=lookahead_avg_destab_mag_ico,
                                         lookahead_avg_destab_mag_eco=lookahead_avg_destab_mag_eco,
                                         lookahead_total_destab_steps_ico=lookahead_total_destab_steps_ico,
-                                        lookahead_total_destab_steps_eco=lookahead_total_destab_steps_eco)
+                                        lookahead_total_destab_steps_eco=lookahead_total_destab_steps_eco,
+                                        lookahead_destab_sustained_ico=lookahead_destab_sustained_ico,
+                                        lookahead_destab_sustained_eco=lookahead_destab_sustained_eco)
+
+    if save_lookahead_windows:
+        new_appended_df = prc.save_lookahead_windows(new_appended_df)
     return new_appended_df
 
 
 if __name__ == "__main__":
     # debugging categorization function
-    import pickle
     test_curr_ahead = 1.0
     test_false_df = pd.read_csv("local/test_false_df.csv")
     test_recorder = pickle.load(open("local/test_recorder.pkl", "rb"))
-    new_df = append_categories(test_false_df, test_recorder, test_curr_ahead)
+    new_df = append_lookahead_stats(test_false_df, test_recorder, test_curr_ahead)
     print("Done!")
