@@ -3,6 +3,8 @@
 """Non-experiment helper functions"""
 
 import time
+import argparse
+from typing import Union, List
 
 
 def calculate_exec_time(begin: float, scr_name: str = "", verbose=True) -> str:
@@ -23,3 +25,15 @@ def calculate_exec_time(begin: float, scr_name: str = "", verbose=True) -> str:
         print("{} {}".format(msg_header, time_str))
 
     return time_str
+
+def parse_layer_size(arg_input: str) -> Union[List[int], None]:
+    """convert layer size input to a list of integer sizes. Raises errors if string is not the correct form.
+    Returns None if input is None."""
+    if arg_input is None:
+        return None
+
+    nums = arg_input.split(",")
+    try:
+        return [int(num) for num in nums]
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{arg_input} does not have the correct format of integers separated by commas. Acceptable forms includes: 3,4,5 or 3")

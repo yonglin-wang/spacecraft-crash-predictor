@@ -77,14 +77,7 @@ def build_keras_rnn(sampling_rate, feature_num, using_seq_label: bool,
     model_out.compile(
         loss='binary_crossentropy',
         optimizer='adam',
-        metrics=[tf.keras.metrics.BinaryAccuracy(name=C.ACC, threshold=threshold),
-                 tf.keras.metrics.AUC(name=C.AUC),
-                 tf.keras.metrics.Precision(name=C.PRECISION),
-                 tf.keras.metrics.Recall(name=C.RECALL),
-                 tf.keras.metrics.PrecisionAtRecall(recall=0.85, name=C.PAT85R),
-                 tf.keras.metrics.PrecisionAtRecall(recall=0.9, name=C.PAT90R),
-                 tf.keras.metrics.PrecisionAtRecall(recall=0.95, name=C.PAT95R),
-                 tf.keras.metrics.PrecisionAtRecall(recall=0.99, name=C.PAT99R)]
+        metrics=C.build_metrics_list(threshold)
     )
     return model_out
 

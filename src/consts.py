@@ -5,6 +5,7 @@ import os
 from collections import OrderedDict
 
 import numpy as np
+import tensorflow as tf
 
 RANDOM_SEED = 2020
 
@@ -146,7 +147,8 @@ GRU = "gru"
 LSTM_LSTM = "lstm-lstm"
 GRU_GRU = "gru-gru"
 MLP = "mlp"
-AVAILABLE_MODELS = [LSTM, GRU, LSTM_LSTM, GRU_GRU]
+CNN = "cnn"
+AVAILABLE_MODELS = [LSTM, GRU, LSTM_LSTM, GRU_GRU, MLP, CNN]
 RNN_MODELS = [LSTM, GRU, LSTM_LSTM, GRU_GRU]
 
 # names for metrics
@@ -159,6 +161,21 @@ PAT90R = "P@90R"
 PAT95R = "P@95R"
 PAT99R = "P@99R"
 ALL_PATR = [PAT85R, PAT90R, PAT95R, PAT99R]     # adjust this list if Precision-at-Recalls are altered
+
+# list of metrics
+def build_metrics_list(threshold: float):
+    return [tf.keras.metrics.BinaryAccuracy(name=ACC, threshold=threshold),
+                 tf.keras.metrics.AUC(name=AUC),
+                 tf.keras.metrics.Precision(name=PRECISION),
+                 tf.keras.metrics.Recall(name=RECALL),
+                 tf.keras.metrics.PrecisionAtRecall(recall=0.85, name=PAT85R),
+                 tf.keras.metrics.PrecisionAtRecall(recall=0.9, name=PAT90R),
+                 tf.keras.metrics.PrecisionAtRecall(recall=0.95, name=PAT95R),
+                 tf.keras.metrics.PrecisionAtRecall(recall=0.99, name=PAT99R)]
+
+# defalt layer sizes
+DEFAULT_MLP_HIDDEN = [32, 16]
+DEFAULT_CNN_LAYERS = [3,4,5]
 
 # model file name under path
 MODEL_PATH = "model"

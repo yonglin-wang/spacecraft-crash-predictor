@@ -14,11 +14,12 @@ import tensorflow as tf
 from sklearn.metrics import confusion_matrix, roc_auc_score
 
 import consts as C
-from utils import calculate_exec_time
+from utils import calculate_exec_time, parse_layer_size
 from processing.marsdataloader import MARSDataLoader
 from processing.dataset_config import load_dataset
 from processing.split_data import Splitter
 from modeling.rnn import build_keras_rnn
+from modeling.non_rnn import build_keras_cnn, build_keras_mlp
 from recording.recorder import Recorder
 
 # Control for random states as much as possible, though on GPU the outputs are unavoidably non-deterministic [1]
@@ -288,13 +289,32 @@ def find_col_inds_for_normalization(config_ID: int, mode: str) -> list:
 
 def match_and_build_model(args, X_train: np.ndarray, using_seq_label: bool)->tf.keras.Sequential:
     """helper function to return correct model based on given input"""
-    if args.model in C.RNN_MODELS:
+    model_name = args.model
+    if model_name in C.RNN_MODELS:
         model = build_keras_rnn(X_train.shape[1],
                                 X_train.shape[2],
                                 using_seq_label,
                                 rnn_out_dim=args.hidden_dim,
                                 dropout_rate=args.dropout,
-                                rnn_type=args.model)
+                                rnn_type=args.model,
+                                threshold=args.threshold)
+    elif model_name in C.AVAILABLE_MODELS:
+        if model_name == C.MLP:
+            model = build_keras_mlp(X_train.shape[1],
+                                    X_train.shape[2],
+                                    using_seq_label,
+                                    layer_sizes=args.layer_sizes,
+                                    threshold=args.threshold)
+        elif model_name == C.CNN:
+            model = build_keras_cnn(X_train.shape[1],
+                                    X_train.shape[2],
+                                    using_seq_label,
+                                    layer_sizes=args.layer_sizes,
+                                    filter_number=args.filter_number,
+                                    dropout_rate=args.dropout,
+                                    threshold=args.threshold)
+        else:
+            raise NotImplementedError("Model {} has not been implemented!".format(args.model))
     else:
         raise NotImplementedError("Model {} has not been implemented!".format(args.model))
 
@@ -448,7 +468,7 @@ def main():
              'if = 0, processed as balanced class-weight for each split.')
     argparser.add_argument(
         '--dropout', type=float, default=0.5,
-        help='dropout rate in RNNs')
+        help='dropout rate in RNN and CNN. No dropout for MLP.')
     argparser.add_argument(
         '--hidden_dim', type=int, default=100,
         help='hidden dimensions in RNNs')
@@ -467,6 +487,15 @@ def main():
     argparser.add_argument(
         '--cv_splits', type=int, default=10,
         help='total number of splits in CV strategy. A split number of 1 is the same as disable CV.')
+    argparser.add_argument(
+        '--layer_sizes', type=parse_layer_size, default=None,
+        help=f'sizes of layers, separated by comma, e.g. 3,4,5 for a 3-conv-layer CNN of conv size 3, 4, and 5. '
+             f'For MLP, hidden layer sizes excluding input and output layer (Default: {C.DEFAULT_MLP_HIDDEN}). '
+             f'For CNN, kernel layer sizes (Default: {C.DEFAULT_CNN_LAYERS}).'
+             f'No effect for other models.')
+    argparser.add_argument(
+        '--filter_number', type=int, default=128,
+        help='For CNN only, number of filters in each convolutional layer.')
 
     # Experiment annotation
     argparser.add_argument(
