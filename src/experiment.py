@@ -362,6 +362,7 @@ def print_training_info(args: argparse.Namespace):
     print(f"Now training model with {int(args.window * 1000)}ms scale, {int(args.ahead * 1000)}ms ahead.\n"
           f"Early Stopping? {args.early_stop}\n"
           f"Using Dataset Configuration #{args.configID}")
+    print(f"model type for this experiment: {args.model}")
 
     if args.early_stop:
         print(f"Stopping early if no {args.conv_crit} improvement in {args.patience} epochs.")

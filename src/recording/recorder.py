@@ -262,10 +262,19 @@ def _find_next_exp_ID() -> int:
 
 
 def _filter_values(vars_dict: dict)->dict:
-    """helper function to filter out dictionary entries whose values are not str, num or bool"""
+    """helper function to filter out dictionary entries whose values are not str, num or bool; called before converting args to column names"""
     output = {key: value for key, value in vars_dict.items() if type(value) in C.ACCEPTABLE_TYPES}
     # ad-hoc popping duplicate keys
     output.pop("seq_label")     # same as using_seq_label in Recorder
+    # ad-hoc for adding layer sizes
+    if vars_dict["model"] in {C.CNN, C.MLP}:
+        output["layer_sizes"] = vars_dict["layer_sizes"]
+    else:
+        output["layer_sizes"] = "NA"
+
+    # ad-hoc change filter_number to NA for non-CNN models
+    if vars_dict["model"] != C.CNN:
+        output["filter_number"] = "NA"
 
     return output
 
