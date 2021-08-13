@@ -5,7 +5,7 @@ import os
 from collections import OrderedDict
 
 import numpy as np
-import tensorflow as tf
+
 
 RANDOM_SEED = 2020
 
@@ -164,6 +164,8 @@ ALL_PATR = [PAT85R, PAT90R, PAT95R, PAT99R]     # adjust this list if Precision-
 
 # list of metrics
 def build_metrics_list(threshold: float):
+    # only import TF when method is called. otherwise can't run on HPCC CPU.
+    import tensorflow as tf
     return [tf.keras.metrics.BinaryAccuracy(name=ACC, threshold=threshold),
                  tf.keras.metrics.AUC(name=AUC),
                  tf.keras.metrics.Precision(name=PRECISION),
