@@ -170,7 +170,7 @@ def build_metrics_list(threshold: float):
 VAL_LOSS = "val_loss"
 VAL_AUC = "val_auc"
 VAL_RECALL = "val_recall"
-VAL_PAT95R = f"val_{PAT95R}"
+VAL_PAT95R = f"val_{PAT95R}".lower()
 CONV_CRIT = [VAL_AUC, VAL_LOSS, VAL_RECALL, VAL_PAT95R]
 CONV_MODE = {VAL_LOSS: "min",
              VAL_AUC: "max",
