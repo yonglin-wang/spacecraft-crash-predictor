@@ -132,15 +132,6 @@ TRAINING_LOG_DIR = os.path.join(EXP_PATH, "train_logs")
 os.makedirs(TRAINING_LOG_DIR, exist_ok=True)
 TRAINING_LOG_FILE = os.path.join(TRAINING_LOG_DIR, "exp{}_split{}")
 
-# convergence criteria, must be consistent with what EarlyStopping supports
-VAL_LOSS = "val_loss"
-VAL_AUC = "val_auc"
-VAL_RECALL = "val_recall"
-CONV_CRIT = [VAL_AUC, VAL_LOSS, VAL_RECALL]
-CONV_MODE = {VAL_LOSS: "min",
-             VAL_AUC: "max",
-             VAL_RECALL: "max"}
-
 # list of available RNN models, all lower-cased
 LSTM = "lstm"
 GRU = "gru"
@@ -174,6 +165,18 @@ def build_metrics_list(threshold: float):
                  tf.keras.metrics.PrecisionAtRecall(recall=0.9, name=PAT90R),
                  tf.keras.metrics.PrecisionAtRecall(recall=0.95, name=PAT95R),
                  tf.keras.metrics.PrecisionAtRecall(recall=0.99, name=PAT99R)]
+
+# convergence criteria and modes, must be consistent with what EarlyStopping supports
+VAL_LOSS = "val_loss"
+VAL_AUC = "val_auc"
+VAL_RECALL = "val_recall"
+VAL_PAT95R = f"val_{PAT95R}"
+CONV_CRIT = [VAL_AUC, VAL_LOSS, VAL_RECALL, VAL_PAT95R]
+CONV_MODE = {VAL_LOSS: "min",
+             VAL_AUC: "max",
+             VAL_RECALL: "max",
+             VAL_PAT95R: "max"}
+
 
 # defalt layer sizes
 DEFAULT_MLP_HIDDEN = [32, 16]
