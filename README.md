@@ -39,6 +39,10 @@ These are the exact steps I used to install the exact versions listed above:
    pip install numpy==1.19.2
    ```
 
+> Note to **Apple M1 chip** users: if using the instructions above, ```import tensorflow``` on Apple M1 chip may result in ```40087 illegal hardware instruction  python``` and Python quitting, in which case please:
+> 1) follow [this solution on SO](https://stackoverflow.com/a/68214296/6716783) to install the compatible version of TensorFlow. 
+> 2) make sure all ```import keras``` are replaced with ```from tensorflow import keras``` to prevent import errors, according to [this answer](https://stackoverflow.com/a/67019039/6716783). 
+
 ## Dataset Requirement
 
 In order to run the code properly, you'll need to put under [data/](data/) directory the raw data file ```data_all.csv```, which contains all the raw data under columns listed in ```ESSENTIAL_RAW_COLS``` in [consts.py](src/consts.py).
