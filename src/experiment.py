@@ -419,11 +419,11 @@ def main():
 
     # Preprocessing flags
     argparser.add_argument(
-        '--window', type=float, default=2.0, help='size of sliding window used in training data, in seconds')
+        '--window', type=float, default=1.0, help='size of sliding window used in training data, in seconds')
     argparser.add_argument(
-        '--ahead', type=float, default=1.0, help='prediction timing ahead of event, in seconds')
+        '--ahead', type=float, default=0.8, help='prediction timing ahead of event, in seconds')
     argparser.add_argument(
-        '--rolling', type=float, default=0.7, help='length of rolling step between two sliding windows, in seconds')
+        '--rolling', type=float, default=0.2, help='length of rolling step between two sliding windows, in seconds')
     argparser.add_argument(
         '--rate', type=int, default=50, help='sampling rate used in window interpolation')
     argparser.add_argument(

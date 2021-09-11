@@ -20,9 +20,9 @@ These are the exact steps I used to install the exact versions listed above:
 
 1. Create new environment named, e.g. tf2, and activate it: 
 
-   ```
-   $ conda create -n tf2
-   $ conda activate tf2
+   ```shell script
+   conda create -n tf2
+   conda activate tf2
    ```
 
 2. Install anaconda python 3.8 if not already
@@ -37,17 +37,103 @@ These are the exact steps I used to install the exact versions listed above:
    pip install tensorflow==2.2.0
    pip install keras==2.4.3
    pip install numpy==1.19.2
+   pip install --user scipy matplotlib ipython jupyter pandas tqdm
    ```
 
-> Note to **Apple M1 chip** users: if using the instructions above, ```import tensorflow``` on Apple M1 chip may result in ```40087 illegal hardware instruction  python``` and Python quitting, in which case please:
-> 1) follow [this solution on SO](https://stackoverflow.com/a/68214296/6716783) to install the compatible version of TensorFlow. 
-> 2) make sure all ```import keras``` are replaced with ```from tensorflow import keras``` to prevent import errors, according to [this answer](https://stackoverflow.com/a/67019039/6716783). 
+> Note to **Apple M1 chip** users: after following the instructions above, ```import tensorflow``` on Apple M1 chip may result in ```40087 illegal hardware instruction  python``` and Python quitting, in which case please:
+> 1. follow [this solution on SO](https://stackoverflow.com/a/68214296/6716783) to install the compatible version of TensorFlow, where we'll need to run the following steps:
+>
+>    > Step 3 Install the tensorflow wheel called `tensorflow-2.4.1-py3-none-any.whl` located at this public google drive link https://drive.google.com/drive/folders/1oSipZLnoeQB0Awz8U68KYeCPsULy_dQ7
+>
+>    > Step 3.1 Assuming you simply installed the wheel to downloads run `pip install ~/Downloads/tensorflow-2.4.1-py3-none-any.whl` in your activated virtual environment
+>
+>    > Step 4 Type python which will bring up `>>>`in your terminal and type
+>    >
+>    > ```py
+>    > >>> import tensorflow
+>    > >>>
+>    > ```
+>    >
+>    > If there is no 'zsh illegal hardware instruction" error you should be good to go.
+>
+>    Note that it's okay to have Tensorflow 2.4.1 after implementing this solution; we did not face any incompatibility issues with other packages such as keras and numpy. 
+>
+> 2. make sure all ```import keras``` are replaced with ```from tensorflow import keras``` to prevent import errors, according to [this answer](https://stackoverflow.com/a/67019039/6716783). 
 
 ## Dataset Requirement
 
-In order to run the code properly, you'll need to put under [data/](data/) directory the raw data file ```data_all.csv```, which contains all the raw data under columns listed in ```ESSENTIAL_RAW_COLS``` in [consts.py](src/consts.py).
+In order to run the code properly, you'll need the raw data file ```data_all.csv```, which contains at least all the columns listed in ```ESSENTIAL_RAW_COLS``` in [consts.py](src/consts.py).
 
-# Run CV Training Experiments
+### Instructions
+
+1. Download the data from [this double-blind-safe link on figshare](https://figshare.com/s/7d935199c01c0edcafa1). 
+2. Rename the downloaded file to ```data_all.csv``` if not already. 
+3. Put the file under [data/](data/) directory. After this step, the file should exist at  [data/data_all.csv](./data/data_all.csv).
+
+# Reproduce the Best Model
+
+In our experiment, we chose the stacked GRU model trained on 1000ms (1s) window size and 800ms time-in-advance (0.8s) as our best model for further result analysis. To train this model, use the commands describe in this section in the given order.
+
+### Step 1. Generate the dataset and train the model 
+
+using the following command:
+
+```shell script
+./src/experiment.py --window 1.0 --ahead 0.8 \
+                   	--early_stop --cv_mode kfold --cv_splits 10 \
+                   	--save_model \
+                   	--configID 3 --normalize all --model gru-gru \
+                   	--notes "stacked gru: converge on AUC"
+```
+
+where:
+
+* ```--configID 3``` : use feature set containing {angular position: float, angular degree: float, joystick deflection: float, destabilizing joystick deflection: bool}
+* ```--normalize all```: normalize all non-categorical features, in this case: angular position, angular degree, joystick deflection.
+* ```--model gru-gru```: train a double-layer stacked GRU model; if you'd just like to test out the entire pipeline, change ```gru-gru``` to ```mlp``` to save time. 
+* ```--save_model```: save the trained model for prediction. 
+
+After this process is done, you should expect the following files to be generated:
+
+* a folder containing preprocessed dataset for this window size and time-in-advance (i.e. ```ahead```) combination, named ```1000window_800ahead_200rolling```, will be created in [data/](./data/) among other auxiliary files. 
+* The best performing model during the 10-fold CV for this experiment saved at [exp/](./exp) folder, named similar to ```exp1_1.0win_0.8ahead_conf3_gru-gru```, including the tensorflow model file and a customized experiment recorder object. ```exp1``` indicates that the experiment ID is 1. 
+* ```exp_ID_config.csv``` and ```exp_results_all.csv``` under [results/](./results/) folder, the former with the configuration of all the experiments and the latter with CV mean and std for various evaluation metrics, both indexed by experiment ID. 
+
+### Step 2. Merge CV results
+
+To view ```exp_ID_config.csv``` and ```exp_results_all.csv```  in one file, merge them by running: 
+
+```shell script
+./src/summary.py --merge
+```
+
+Follow the standard output to locate the merged file, which, if no duplicate file has been generated before, should be [results/hpcc_results.csv](./results/hpcc_results.csv), also indexed by experiment ID.
+
+### Step 3. Evaluate the Model on Test Set
+
+To evaluate the model on the test set and generate test set predictions for analysis, run:
+
+```shell script
+./src/predict.py <YOUR EXP NUMBER> --save_preds_csv --save_lookahead_windows --at_recall 0.95
+```
+
+where:
+
+* ```<YOUR EXP NUMBER>``` corresponds to the exp# for the model saved at [exp/](./exp) folder. If this is your first time running this program, it should be ```1```. 
+* ```--save_preds_csv```: save all the test set input data windows and their predictions
+* ```--save_lookahead_windows```: save the features in the time-in-advance duration corresponding to each input sliding window, i.e. between ```endtime_of_sliding_window``` and ```endtime_of_sliding_window + time_in_advance_duration```. We use these features to perform error analysis, e.g. savable crashes.
+* ```--at_recall 0.95```: when generating testset predictions, set the decision threshold of the model to the value that yields a recall of 0.95. 
+
+After this process is done, you should expect the following files to be generated:
+
+* [results/heldout_pred_res.csv](./results/heldout_pred_res.csv): test set evaluation metrics for all experiments; each test set prediction has its own ID because each exp ID could be evaluated multiple time using different precision at recall thresholds. 
+* a table named ```<pred_id>heldoutPred_expID<expID>_<threshold>DecThresh_FalsePreds_1000.0win_800.0trainahead_0testahead.csv``` under [results/](./results/), containing the **False** predicitons in the test dataset and a table named ```<pred_id>heldoutPred_expID<expID>_<threshold>DecThresh_FalsePreds_1000.0win_800.0trainahead_0testahead.csv``` under [results/](./results/), containing the **True** predicitons in the test dataset. We primarily used these two files in our error analysis. 
+
+# Detailed Explanation for Each Step
+
+You can skip this section if you only wish to recreate the best model, which you should be able to obtain by following the previous section. 
+
+## Run CV Training Experiments
 
 ```./src/experiment.py``` runs an experiment pipeline, which puts together preprocessing, modeling, evaluation, and logging. 
 
@@ -77,15 +163,15 @@ Under project root, run ```$ ./src/experiment.py -h``` to see all available argu
   ./src/experiment.py --pbar <other arguments>
   ```
 
-# Evaluate Saved Model on Held-out Test Sets
+## Evaluate Saved Model on Held-out Test Sets
 With [predict.py](src/predict.py), the model obtained from running [experiment.py](src/experiment.py) above can be evaluated on test sets from datasets, potentially with a different look ahead time. 
 
-## What you'll need
+### What you'll need
 Before running [predict.py](src/predict.py), you'll need to have run at least 1 experiment where you've saved a model. In this way, the script can read the training record and saved model under [exp/](exp) folder. 
 
 You'll need to specify the id of the experiment (found under ```Experiment ID``` column in ```results/exp_ID_config.csv```). By default, if no ```--ahead``` time is specified, the model will evaluate on the original dataset (which mean the original time ahead).
 
-## Example
+### Example
 For example, if we want to evaluate the model saved from Experiment 206 (i.e. ```Experiment ID```=206) and save the held-out test set predictions as csv files, use
 
 ```shell script
@@ -104,9 +190,9 @@ $ .src/predict.py 206 --ahead 0.7
 ```
 Note that if the dataset with the new time ahead does not exist, the program will automatically generate the dataset before evaluating the model.
 
-# Examine Results
+## Examine Results
 
-## Result Files
+### Result Files
 
 Under [results/](results/), ```experiment.py``` script automatically saves the the experiment configuration (in ```exp_ID_config.csv```) and result metrics (in ```exp_results_all.csv```). If these files don't exist upon recording, they will be created from the templates in ```./reasults/template```. 
 
@@ -125,12 +211,12 @@ Each experiment will be indexed with a unique ID number. The two tables can be j
 - various metrics on test set data, such as AUC, F1, accuracy, precision, recall, etc.
 - if a CV strategy is used, standard deviation and mean of the metrics will be reported.
 
-## Merging Result Files
+### Merging Result Files
 
 The following command allows you to join ```exp_results_all.csv``` (left) and  ```exp_ID_config.csv``` (right) on ```experiment ID``` column and save the combined table to ```hpcc_results.csv```. 
 
-```
-$ ./src/summary.py --merge
+```bash
+./src/summary.py --merge
 ```
 
 To avoid overwriting existing merged files, An integer will be appended at the end of the output file

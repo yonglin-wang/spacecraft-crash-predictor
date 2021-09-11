@@ -8,7 +8,7 @@ from functools import partial
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.model_selection import train_test_split
-from keras.preprocessing import sequence
+from tensorflow.keras.preprocessing import sequence
 
 from processing.marsdataloader import MARSDataLoader
 from processing.extract_features import broadcast_to_sampled
