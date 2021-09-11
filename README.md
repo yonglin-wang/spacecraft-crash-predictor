@@ -2,8 +2,6 @@
 
 This project aims to build a classifier that predicts potential spacecraft crashes in advance, based on the time series of the subject's control and status in a pre-defined window. 
 
-This work is part of a project accepted by NASA/TRISH's GoForLaunch program, with a greater aim to enhance human performance in space flights and postural balancing tasks. For details, see [Dr. Vimal's project description and research roadmap](https://sites.google.com/view/vivekanandpandeyvimal/research_2/current-research?authuser=0#h.on5o56f1ne5m). The project is the collaboration between the Neuroscience and CS departments at Brandeis University. 
-
 # Requirements
 
 ## General Package Requirement
@@ -291,7 +289,3 @@ However, if you'd still like to (e.g. due to bugs found in preprocessing code or
 - every visible file and directory under [data](data/) except for ```data_all.csv```
 - every visible file and directory under [results/](results/) except for the [template/](results/template) folder
 - every visible file and directory under [exp/](exp/)
-
-# Acknowledgements
-
-Special thanks to [Jie Tang](https://github.com/TJmask), some of whose [code logic for the same task](https://github.com/TJmask/Space-Health-Predicting) has been especially helpful in building this project; Jie's name will be included the docstring sections of the functions, wherever credit is due. 

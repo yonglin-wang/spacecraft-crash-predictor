@@ -1,4 +1,3 @@
-# Author: Yonglin Wang
 # Date: 2021/1/29
 """Constants used in scripts. Crucially, to prevent circular import, this script does not import relative modules."""
 import os

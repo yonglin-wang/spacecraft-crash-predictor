@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# Author: Yonglin Wang
 # Date: 2021/3/21 10:14 PM
 # Run prediction on held-out test sets, supports 1) running on test sets with different look ahead times
 # and 2) running on new threshold at a specific recall

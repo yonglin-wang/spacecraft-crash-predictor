@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# Author: Yonglin Wang
 # Date: 2021/3/14 9:48 PM
 import pickle
 from collections import OrderedDict, defaultdict

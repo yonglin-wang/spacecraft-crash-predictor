@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# Author: Yonglin Wang
 # Date: 2021/1/29
 # Functions to generate csv summaries of data statistics and merge result statistics
 

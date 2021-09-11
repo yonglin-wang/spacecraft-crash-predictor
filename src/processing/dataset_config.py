@@ -1,4 +1,3 @@
-# Author: Yonglin Wang
 # Date: 2021/1/29
 """Data wrangling configurations for X and y after train test split, output ready for fitting in model"""
 

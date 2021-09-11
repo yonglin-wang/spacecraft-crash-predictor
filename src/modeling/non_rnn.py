@@ -1,4 +1,3 @@
-# Author: Yonglin Wang
 # Date: 2021/1/30 11:01 PM
 
 from typing import List

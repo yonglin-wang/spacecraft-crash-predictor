@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Author: Yonglin Wang
 # Date: 2021/1/31 11:04 PM
 """Displays history and model summary of a given experiment ID"""
 

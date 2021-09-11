@@ -1,4 +1,3 @@
-# Author: Yonglin Wang
 # Date: 2021/1/29
 """Non-experiment helper functions"""
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# Author: Yonglin Wang
 # Date: 2021/1/29
 """main class for parsing commandline input, creating DataLoader and training a model"""
 

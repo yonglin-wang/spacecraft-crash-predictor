@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Author: Yonglin Wang
 # Date: 2021/1/31 9:47 PM
 """
 Lightweight class to record training and dataset file info for later retrieval.

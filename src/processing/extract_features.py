@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Author: Yonglin Wang
 # Date: 2021/1/27
 # Functions for extracting and saving feature numpy arrays
 
@@ -32,7 +31,6 @@ def _extract_sliding_windows(interval_series: pd.Series, window_size: float, rol
     """
     Identify extractable valid window boundaries (inclusive) in given slice of the seconds column.
     1st window aligns with interval start, while last is last one possible before window end exceeds interval end.
-    :authors: Jie Tang, Yonglin Wang
     :param interval_series: series of time points between 2 crash events
     :param window_size: time scale length of data used for prediction in seconds, i.e. size of window
     :param rolling_step: length of rolling step in seconds
@@ -216,7 +214,6 @@ def generate_feature_files(window_size: float,
                            show_pbar=False) -> int:
     """
     Extract basic features columns from raw data and saving them to disk; main function of this script
-    :author: Yonglin Wang
     :param window_size: time length of data used for training, in seconds
     :param time_ahead: time in advance to predict, in seconds
     :param sampling_rate: sampling rate in each window

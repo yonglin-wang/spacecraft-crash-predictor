@@ -1,4 +1,3 @@
-# Author: Yonglin Wang
 # Date: 2021/2/13 4:48 PM
 """Generate split indices for dataset either via Stratified K-Fold or leaving out N participants"""
 

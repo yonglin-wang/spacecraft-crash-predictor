@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# Author: Yonglin Wang
 # Date: 2021/1/27
 # Data loader class for organizing numpy feature arrays and assembling training matrices
 

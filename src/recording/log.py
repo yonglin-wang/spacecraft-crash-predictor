@@ -1,4 +1,3 @@
-# Author: Yonglin Wang
 # Date: 2021/5/30 4:00 PM
 # Returns a customized Python Logger object for displaying and saving messages
 
