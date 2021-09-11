@@ -85,14 +85,4 @@ def build_keras_mlp(sampling_rate: int, feature_num: int, using_seq_label: bool,
 
 
 if __name__ == "__main__":
-    # test cases
-    import numpy as np
-    test_X = np.load("/Users/Violin/GitHub/spacecraft-crash-predictor/local/2000win1000ahead_split1/xtest.npy")
-    test_y = np.load("/Users/Violin/GitHub/spacecraft-crash-predictor/local/2000win1000ahead_split1/ytest.npy")
-
-    print("X shape: " + str(test_X.shape))
-
-    # test model
-    cnn = build_keras_cnn(50,3,False,layer_sizes=[3,4,5,6])
-    ffnn = build_keras_mlp(50, 3, False)
-    cnn.fit(test_X, test_y, epochs=50)
+    pass

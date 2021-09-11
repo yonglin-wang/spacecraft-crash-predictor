@@ -154,10 +154,4 @@ def _save_test_train_split(episode_ids: list,
 
 
 if __name__ == "__main__":
-    s = Splitter(C.KFOLD, 5, np.load("/Users/Violin/GitHub/spacecraft-crash-predictor/data/2000window_1000ahead_100rolling/episode_id.npy"))
-    # X = np.random.random((10,2))
-    y = np.random.randint(0, 1, (10, 1))
-    names = np.array(list("aabbcccddd"))
-
-    for n in enumerate(s.split_ind_generator(y)):
-        print(n)
+    pass
