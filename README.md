@@ -37,7 +37,7 @@ These are the exact steps I used to install the exact versions listed above:
    pip install tensorflow==2.2.0
    pip install keras==2.4.3
    pip install numpy==1.19.2
-   pip install --user scipy matplotlib ipython jupyter pandas tqdm
+   pip install --user scipy matplotlib ipython jupyter pandas tqdm sklearn
    ```
 
 > Note to **Apple M1 chip** users: after following the instructions above, ```import tensorflow``` on Apple M1 chip may result in ```40087 illegal hardware instruction  python``` and Python quitting, in which case please:
