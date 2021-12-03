@@ -1,0 +1,8 @@
+
+results/.predIDs
+results/.expIDs
+results/hpcc_results*.csv
+results/heldout_pred_res.csv
+results/exp_ID_config.csv
+results/exp_results_all.csv
+results/*testahead.csv
