@@ -1,4 +1,8 @@
 # Dev Tips: How to Add New Code
+## Running Experiments on HPCC
+Research assisstants at Brandeis should refer to [Initial Set Up Instructions](https://docs.google.com/document/d/1s9GzIPajZSfqRGhotvU8dn_GdYl3CIp_b3plCz54Xq0/edit?usp=sharing) for setting up HPCC environment from scratch (i.e. all the way from creating account to using sbatch to run the test commands). 
+
+Please contact the repo owner (YW) if you need access to the document.
 
 ## Code for Extracting New Feature
 Whenever a new feature is proposed:
