@@ -219,83 +219,10 @@ The following command allows you to join ```exp_results_all.csv``` (left) and  `
 ./src/summary.py --merge
 ```
 
-To avoid overwriting existing merged files, An integer will be appended at the end of the output fil
-
-# Dev Tips
-
-<<<<<<< Updated upstream
-## Code for Extracting New Feature
-Whenever a new feature is proposed:
-1. Write its extraction function in [extract_features.py](src/processing/extract_features.py)
-2. In [consts.py](src/consts.py), add the feature name and column path to ```COL_PATHs``` dictionary
-3. If a new, non-categorical feature has a range much larger than joystick's [-1, 1], e.g. position and velocity: this feature is a large value feature, and you should add its name to ```LARGE_VAL_FEATS``` in [consts.py](src/consts.py). In this way, the large features will be normalized to match joystick's range if a ```--normalize large``` option is specified.
-4. If the feature is categorical, e.g. destabilizing joystick deflection, add it to ```CATEGORICAL_FEATS``` in [consts.py](src/consts.py), since we crucially do NOT want to normalize them in any normalization mode.
-5. Add feature extraction function call as ```self._save_col(<function call and return>, <feature name>)``` in ```__init__``` method of [MARSDataLoader](src/processing/marsdataloader.py)
-6. When you initialize a new MARSDataLoader, it will automatically include the new feature.
-
-## Code for New Feature Combination (i.e. Configuration of Datasets used in Training)
-Whenever a new feature combination is proposed:
-1. Pick a unique intger ```n``` as your ```config_id```, e.g. ```100```, and put it in set ```CONFIG_IDS``` in [consts.py](src/consts.py)
-
-2. Write the configuration function with name in format similar to ```_generate_config_<n>``` in [dataset_config.py](src/processing/dataset_config.py), which takes at least a ```MARSDataLoader``` object and returns a 6-tuple of numpy arrays ```train_inds```, ```test_inds```, ```X_train```, ```X_test```, ```y_train```, ```y_test```
-
-3. Insert ID and configuration function in ```load_splits``` in [dataset_config.py](src/processing/dataset_config.py), with following logic:
-    ```
-    elif config_id == <config_id>:
-        config = <name of new config function>
-    ```
-    
-4. Insert an entry with the following format in dictionary ```CONFIG_SPECS``` in [consts.py](src/consts.py)
-
-    ```
-    <config_id>: {COLS_USED: [], CONFIG_OVERVIEW: ""}
-    ```
-
-Then, when you create a new instance of ```MARSDataLoader``` and call ```load_splits``` in [dataset_config.py](src/processing/dataset_config.py) with ```config_id=<new config ID>```, the 6-tuple with the new configuration will be returned.
-
-## Code for New Model Architecture
-Whenever a new model build has been proposed:
-
-- For ```tensorflow.keras.Sequential``` models (see ```LSTM``` and ```GRU``` for examples):
-
-  1. Create a new build function to return a complied model in the approporiate script in ```scr/modeling/```
-
-  2. Add the new model's name to [consts.py](src/consts.py), with all caps variable name and lowercased string name, i.e. ```MODEL_NAME="name"```, and insert it into list ```AVAILABLE_MODELS``` and another model subgroup (e.g. ```RNN_MODELS```) as you see fit.
-
-  3. Insert the following script into ```match_and_build_model``` function in [experiment.py](src/experiment.py):
-
-     ```
-     elif args.model in C.<MODEL_SUBGROUP>:
-     		model = <call build function>
-     ```
-
-  Then, when you run ```experiment.py``` with ```--model <new model name>```, the new model will be used.
-
-- Other models: TBD! Note: if not a Keras model, saving methods such as ```model.save()``` may not be compatible. 
-
-## Code for New Experiment Option
-
-Whenever you need to add a new option to the experiment:
-
-1. add the option to ```argparser``` in ```main()``` in [experiment.py](src/experiment.py)
-2. if you'd like the argument to have a different display name in the [experiment configuration file](results/template/exp_ID_config.csv), add a ```('<option name>', '<name to display in results file>')``` to the ```COL_CONV``` dictionary in [consts.py](src/consts.py), 
-3. new settings by default gets appended after the template columns. To have the new option appear in a specific place, add it to the template, and the change will be reflected after the experiment output has been cleared.
-
-Note: only numbers, booleans, np.float, and strings will be saved. See ```ACCEPTABLE_TYPES``` in [consts.py](src/consts.py).
-
-## Clearing Experiment Output
-
-The code has been organized in a way that additional experiment options and evaluation metrics will be appended to the existing configuration file and results file as new columns, and missing columns will simply be left blank. Thus, there's no need to clear output for new code added.  
-
-However, if you'd still like to (e.g. due to bugs found in preprocessing code or model output), clear the following directories:
-
-- every visible file and directory under [data](data/) except for ```data_all.csv```
-- every visible file and directory under [results/](results/) except for the [template/](results/template) folder
-- every visible file and directory under [exp/](exp/)
+To avoid overwriting existing merged files, an integer will be appended at the end of the output file
 
 # Acknowledgements
 
-Special thanks to [Jie Tang](https://github.com/TJmask), some of whose [code logic for the same task](https://github.com/TJmask/Space-Health-Predicting) has been especially helpful in building this project; Jie's name will be included the docstring sections of the functions, wherever credit is due. 
-=======
-For tips on adding new models or new features, please see [src folder's README](src/README.md)
->>>>>>> Stashed changes
+Special thanks to [Jie Tang](https://github.com/TJmask), some of whose [code logic for the same task](https://github.com/TJmask/Space-Health-Predicting) has been especially helpful in building this project; Jie's name will be included the docstring sections of the functions, wherever credit is due.
+
+For tips on adding new models or new features, please see [src folder's README](https://github.com/yonglin-wang/spacecraft-crash-predictor/blob/main/src/README.md)
