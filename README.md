@@ -219,10 +219,11 @@ The following command allows you to join ```exp_results_all.csv``` (left) and  `
 ./src/summary.py --merge
 ```
 
-To avoid overwriting existing merged files, An integer will be appended at the end of the output file
+To avoid overwriting existing merged files, An integer will be appended at the end of the output fil
 
-# Dev Tips: How to Add New Code
+# Dev Tips
 
+<<<<<<< Updated upstream
 ## Code for Extracting New Feature
 Whenever a new feature is proposed:
 1. Write its extraction function in [extract_features.py](src/processing/extract_features.py)
@@ -295,3 +296,6 @@ However, if you'd still like to (e.g. due to bugs found in preprocessing code or
 # Acknowledgements
 
 Special thanks to [Jie Tang](https://github.com/TJmask), some of whose [code logic for the same task](https://github.com/TJmask/Space-Health-Predicting) has been especially helpful in building this project; Jie's name will be included the docstring sections of the functions, wherever credit is due. 
+=======
+For tips on adding new models or new features, please see [src folder's README](src/README.md)
+>>>>>>> Stashed changes
