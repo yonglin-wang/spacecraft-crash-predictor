@@ -9,6 +9,9 @@ import time
 from typing import Tuple
 from collections import OrderedDict
 
+# suppress TF debugging logs, done before importing TF
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 import numpy as np
 import tensorflow as tf
 from sklearn.metrics import confusion_matrix, roc_auc_score
@@ -19,7 +22,7 @@ from processing.marsdataloader import MARSDataLoader
 from processing.dataset_config import load_dataset
 from processing.split_data import Splitter
 from modeling.rnn import build_keras_rnn
-from modeling.non_rnn import build_keras_cnn, build_keras_mlp, build_keras_linear
+from modeling.non_rnn import build_keras_cnn, build_keras_mlp
 from recording.recorder import Recorder
 
 # Control for random states as much as possible, though on GPU the outputs are unavoidably non-deterministic [1]

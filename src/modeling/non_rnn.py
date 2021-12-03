@@ -8,7 +8,7 @@ import tensorflow as tf
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Conv1D, MaxPooling1D, Flatten
 
-from compile_model import compile_model
+from modeling.compile_model import compile_model
 import consts as C
 
 
@@ -78,22 +78,8 @@ def build_keras_mlp(sampling_rate: int, feature_num: int, using_seq_label: bool,
 
 
 if __name__ == "__main__":
-<<<<<<< Updated upstream
-    # test cases
-    import numpy as np
-    test_X = np.load("/Users/Violin/GitHub/spacecraft-crash-predictor/local/2000win1000ahead_split1/xtest.npy")
-    test_y = np.load("/Users/Violin/GitHub/spacecraft-crash-predictor/local/2000win1000ahead_split1/ytest.npy")
-
-    print("X shape: " + str(test_X.shape))
-
-    # test model
-    cnn = build_keras_cnn(50,3,False,layer_sizes=[3,4,5,6])
-    ffnn = build_keras_mlp(50, 3, False)
-    cnn.fit(test_X, test_y, epochs=50)
-=======
     test_X = tf.ones((1, 50, 3))
     # change the build function below to inspect
     model = build_keras_mlp(50, 3, False, layer_sizes=[])
     y = model(test_X)
     model.summary()
->>>>>>> Stashed changes

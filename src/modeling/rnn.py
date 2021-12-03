@@ -10,7 +10,7 @@ from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense, Dropout, TimeDistributed
 
 import consts as C
-from compile_model import compile_model
+from modeling.compile_model import compile_model
 
 
 def build_keras_rnn(sampling_rate, feature_num, using_seq_label: bool,
