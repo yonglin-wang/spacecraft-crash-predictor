@@ -10,6 +10,7 @@ from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense, Dropout, TimeDistributed
 
 import consts as C
+from compile_model import compile_model
 
 
 def build_keras_rnn(sampling_rate, feature_num, using_seq_label: bool,
@@ -74,11 +75,7 @@ def build_keras_rnn(sampling_rate, feature_num, using_seq_label: bool,
         model_out.add(Dense(1, activation='sigmoid'))
 
     # compile model
-    model_out.compile(
-        loss='binary_crossentropy',
-        optimizer='adam',
-        metrics=C.build_metrics_list(threshold)
-    )
+    model_out = compile_model(model_out, threshold)
     return model_out
 
 

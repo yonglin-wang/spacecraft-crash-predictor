@@ -19,7 +19,7 @@ from processing.marsdataloader import MARSDataLoader
 from processing.dataset_config import load_dataset
 from processing.split_data import Splitter
 from modeling.rnn import build_keras_rnn
-from modeling.non_rnn import build_keras_cnn, build_keras_mlp
+from modeling.non_rnn import build_keras_cnn, build_keras_mlp, build_keras_linear
 from recording.recorder import Recorder
 
 # Control for random states as much as possible, though on GPU the outputs are unavoidably non-deterministic [1]
@@ -312,6 +312,12 @@ def match_and_build_model(args, X_train: np.ndarray, using_seq_label: bool)->tf.
                                     layer_sizes=args.layer_sizes,
                                     filter_number=args.filter_number,
                                     dropout_rate=args.dropout,
+                                    threshold=args.threshold)
+        elif args.model in C.LINEAR:
+            model = build_keras_mlp(X_train.shape[1],
+                                    X_train.shape[2],
+                                    using_seq_label,
+                                    layer_sizes=[],     # no hidden layer -> simple linear
                                     threshold=args.threshold)
         else:
             raise NotImplementedError("Model {} has not been implemented!".format(args.model))

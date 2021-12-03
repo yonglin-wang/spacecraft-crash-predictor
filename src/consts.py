@@ -139,7 +139,8 @@ LSTM_LSTM = "lstm-lstm"
 GRU_GRU = "gru-gru"
 MLP = "mlp"
 CNN = "cnn"
-AVAILABLE_MODELS = [LSTM, GRU, LSTM_LSTM, GRU_GRU, MLP, CNN]
+LINEAR = "linear"
+AVAILABLE_MODELS = [LSTM, GRU, LSTM_LSTM, GRU_GRU, MLP, CNN, LINEAR]
 RNN_MODELS = [LSTM, GRU, LSTM_LSTM, GRU_GRU]
 
 # names for metrics

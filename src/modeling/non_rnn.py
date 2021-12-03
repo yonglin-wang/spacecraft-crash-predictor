@@ -8,6 +8,7 @@ import tensorflow as tf
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Conv1D, MaxPooling1D, Flatten
 
+from compile_model import compile_model
 import consts as C
 
 
@@ -42,11 +43,7 @@ def build_keras_cnn(sampling_rate: int, feature_num: int, using_seq_label: bool,
     model.add(Dense(1, activation='sigmoid'))
 
     # compile model
-    model.compile(
-        loss='binary_crossentropy',
-        optimizer='adam',
-        metrics=C.build_metrics_list(threshold)
-    )
+    model = compile_model(model, threshold)
     return model
 
 
@@ -59,7 +56,7 @@ def build_keras_mlp(sampling_rate: int, feature_num: int, using_seq_label: bool,
     :param sampling_rate:
     :param feature_num:
     :param using_seq_label:
-    :param layer_sizes: list of hidden layer size, not including first layer and last
+    :param layer_sizes: list of hidden layer size, not including input and output
     :param threshold:
     :return:
     """
@@ -70,22 +67,18 @@ def build_keras_mlp(sampling_rate: int, feature_num: int, using_seq_label: bool,
 
     model = Sequential()
 
-    model.add(Flatten())
-    model.add(Dense(units=sampling_rate * feature_num, activation='relu'))
+    model.add(Flatten(input_shape=(sampling_rate, feature_num)))
     for hidden_size in layer_sizes:
         model.add(Dense(units=hidden_size, activation='relu'))
     model.add(Dense(1, activation='sigmoid'))
 
     # compile model
-    model.compile(
-        loss='binary_crossentropy',
-        optimizer='adam',
-        metrics=C.build_metrics_list(threshold)
-    )
+    model = compile_model(model, threshold)
     return model
 
 
 if __name__ == "__main__":
+<<<<<<< Updated upstream
     # test cases
     import numpy as np
     test_X = np.load("/Users/Violin/GitHub/spacecraft-crash-predictor/local/2000win1000ahead_split1/xtest.npy")
@@ -97,3 +90,10 @@ if __name__ == "__main__":
     cnn = build_keras_cnn(50,3,False,layer_sizes=[3,4,5,6])
     ffnn = build_keras_mlp(50, 3, False)
     cnn.fit(test_X, test_y, epochs=50)
+=======
+    test_X = tf.ones((1, 50, 3))
+    # change the build function below to inspect
+    model = build_keras_mlp(50, 3, False, layer_sizes=[])
+    y = model(test_X)
+    model.summary()
+>>>>>>> Stashed changes
