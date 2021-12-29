@@ -127,7 +127,7 @@ where:
 After this process is done, you should expect the following files to be generated:
 
 * [results/heldout_pred_res.csv](./results/heldout_pred_res.csv): test set evaluation metrics for all experiments; each test set prediction has its own ID because each exp ID could be evaluated multiple time using different precision at recall thresholds. 
-* a table named ```<pred_id>heldoutPred_expID<expID>_<threshold>DecThresh_FalsePreds_1000.0win_800.0trainahead_0testahead.csv``` under [results/](./results/), containing the **False** predicitons in the test dataset and a table named ```<pred_id>heldoutPred_expID<expID>_<threshold>DecThresh_FalsePreds_1000.0win_800.0trainahead_0testahead.csv``` under [results/](./results/), containing the **True** predicitons in the test dataset. We primarily used these two files in our error analysis. 
+* a table named ```<pred_id>heldoutPred_expID<expID>_<threshold>DecThresh_FalsePreds_1000.0win_800.0trainahead_0testahead.csv``` under [results/](./results/), containing the **False** predicitons in the test dataset and a table named ```<pred_id>heldoutPred_expID<expID>_<threshold>DecThresh_TruePreds_1000.0win_800.0trainahead_0testahead.csv``` under [results/](./results/), containing the **True** predicitons in the test dataset. We primarily used these two files in our error analysis. 
 
 # Detailed Explanation for Each Step
 
