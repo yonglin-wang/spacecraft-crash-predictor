@@ -66,7 +66,7 @@ In order to run the code properly, you'll need the raw data file ```data_all.csv
 
 ### Instructions
 
-1. Download the data from [this double-blind-safe link on figshare](https://figshare.com/s/7d935199c01c0edcafa1). 
+1. Download the data from [this Google Drive link](https://drive.google.com/file/d/15SgiS-vImzaIZbw32i6Nmju_2d_lThS2/view?usp=sharing) (please contact repo owner for access). 
 2. Rename the downloaded file to ```data_all.csv``` if not already. 
 3. Put the file under [data/](data/) directory. After this step, the file should exist at  [data/data_all.csv](./data/data_all.csv).
 
