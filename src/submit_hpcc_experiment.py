@@ -46,7 +46,6 @@ def main():
             print(f"Command above finished with exit code {exit_code}")
 
     print(f"\n[Final Message] Congrats! Successfully submitted {len(configs)} jobs!")
-    pass
 
 
 def execute_echo_test(processed_exp_dict: dict) -> int:
