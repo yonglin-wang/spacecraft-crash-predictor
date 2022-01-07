@@ -19,27 +19,33 @@ SHELL_SEP = "\n"
 
 
 def main():
-    # command line parser, uncomment the following if needed
-    # noinspection PyTypeChecker
-    # parser = argparse.ArgumentParser(prog="Name of Program",
-    #                                  description="Program Description",
-    #                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    # parser.add_argument("positional",
-    #                     type=int,
-    #                     help="a positional argument")
-    # parser.add_argument('--float',
-    #                     type=float,
-    #                     default=0.5,
-    #                     help='optional float with default of 0.5')
-    # parser.add_argument("-o", "--optional_argument",
-    #                     type=str,
-    #                     default=None,
-    #                     help="optional argument; shorthand o")
-    # parser.add_argument("-t", "--now_true",
-    #                     action="store_true",
-    #                     help="boolean argument, stores true if specified, false otherwise; shorthand t")
-    #
-    # args = parser.parse_args()
+    template = __load_file_template()
+    # by default, any names not in template is considered to be passed to the .py script
+    names_in_template = set(
+        [field_name for _, field_name, _, _ in Formatter().parse(template) if field_name is not None])
+
+    # process and execute exp config
+    configs = pd.read_csv("hpcc_exp_configs.csv")
+    for i, row in configs.iterrows():
+        print("\n" + "=*-+" * 5 + f"Now processing experiment at row {i} (0-based index)..." + "=*-+" * 5)
+
+        # process bool args and add exp_param str
+        raw_exp_info_dict: OrderedDict = row.to_dict(into=OrderedDict)
+        exp_info_dict = __add_exp_param_string_to_dict(__process_boolean_options(raw_exp_info_dict), names_in_template)
+
+        # test with following line, to be deleted when running experiments
+        # exit_code = execute_echo_test(exp_info_dict)
+        # exit_code = os.system("sbatch nonexistent.sh")
+        # submit a sbatch job using the following line
+        exit_code = execute_sbatch_shell_script(template, exp_info_dict)
+        # implement the if statement for exit_code as described in instructions
+        if exit_code != 0:
+            # raise ValueError, giving exit code
+            raise ValueError(f"exit code {exit_code} is not 0! exp_info_dict content: {exp_info_dict}")
+        else:
+            print(f"Command above finished with exit code {exit_code}")
+
+    print(f"\n[Final Message] Congrats! Successfully submitted {len(configs)} jobs!")
     pass
 
 
@@ -133,34 +139,7 @@ def execute_sbatch_shell_script(template_txt: str, processed_exp_dict: OrderedDi
 
 
 if __name__ == "__main__":
-    # TODO use this if __name__ == "__main__" statement for testing;
+    # use this if __name__ == "__main__" statement for testing;
     #   once all ready, move everything into main() and uncomment following
-    # main()
-
-    template = __load_file_template()
-    # by default, any names not in template is considered to be passed to the .py script
-    names_in_template = set(
-        [field_name for _, field_name, _, _ in Formatter().parse(template) if field_name is not None])
-
-    # process and execute exp config
-    configs = pd.read_csv("hpcc_exp_configs.csv")
-    for i, row in configs.iterrows():
-        print("\n" + "=*-+" * 5 + f"Now processing experiment at row {i} (0-based index)..." + "=*-+" * 5)
-
-        # process bool args and add exp_param str
-        raw_exp_info_dict: OrderedDict = row.to_dict(into=OrderedDict)
-        exp_info_dict = __add_exp_param_string_to_dict(__process_boolean_options(raw_exp_info_dict), names_in_template)
-
-        # TODO test with following line, to be deleted when running experiments
-        exit_code = execute_echo_test(exp_info_dict)
-        # TODO submit a sbatch job using the following line
-        # exit_code = execute_sbatch_shell_script(template, exp_info_dict)
-        # TODO implement the if statement for exit_code as described in instructions
-        if exit_code != 0:
-            # TODO raise ValueError, giving exit code
-            ...
-        else:
-            print(f"Command above finished with exit code {exit_code}")
-
-    print(f"\n[Final Message] Congrats! Successfully submitted {len(configs)} jobs!")
+    main()
 
