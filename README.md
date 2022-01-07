@@ -103,7 +103,9 @@ After this process is done, you should expect the following files to be generate
 
 OK, try this 1 epoch, no CV, command that trains a linear model: 
 
-```./src/experiment.py --pbar --window 1.0 --ahead 0.8 --max_epoch 1 --cv_mode disable --save_model --configID 1 --model linear --notes "testing only: linear no CV"```
+```shell script
+./src/experiment.py --pbar --window 1.0 --ahead 0.8 --max_epoch 1 --cv_mode disable --save_model --configID 1 --model linear --notes "testing only: linear no CV"
+```
 
 Note that if you don't have a preprocessed ```--window 1.0 --ahead 0.8``` dataset, it will take ~20-40min to create the dataset, depending on your hardware. 
 
