@@ -99,6 +99,14 @@ After this process is done, you should expect the following files to be generate
 * The best performing model during the 10-fold CV for this experiment saved at [exp/](./exp) folder, named similar to ```exp1_1.0win_0.8ahead_conf3_gru-gru```, including the tensorflow model file and a customized experiment recorder object. ```exp1``` indicates that the experiment ID is 1. 
 * ```exp_ID_config.csv``` and ```exp_results_all.csv``` under [results/](./results/) folder, the former with the configuration of all the experiments and the latter with CV mean and std for various evaluation metrics, both indexed by experiment ID. 
 
+#### But I just wanna run a quick test!
+
+OK, try this 1 epoch, no CV, command that trains a linear model: 
+
+```./src/experiment.py --pbar --window 1.0 --ahead 0.8 --max_epoch 1 --cv_mode disable --save_model --configID 1 --model linear --notes "testing only: linear no CV"```
+
+Note that if you don't have a preprocessed ```--window 1.0 --ahead 0.8``` dataset, it will take ~20-40min to create the dataset, depending on your hardware. 
+
 ### Step 2. Merge CV results
 
 To view ```exp_ID_config.csv``` and ```exp_results_all.csv```  in one file, merge them by running: 
