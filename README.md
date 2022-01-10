@@ -231,6 +231,26 @@ The following command allows you to join ```exp_results_all.csv``` (left) and  `
 
 To avoid overwriting existing merged files, an integer will be appended at the end of the output file
 
+# Automated Experiments
+
+**NOTE: this section is only for people with an HPCC account AND access to the lab's shared Google Drive**
+
+To reduce the time needed to run multiple experiment on HPCC using sbatch, we've introduced a new [submit_hpcc_experiment.py](src/submit_hpcc_experiment.py) script which reads the experiment configurations specified in [hpcc_exp_configs.csv](hpcc_exp_configs.csv), one row per experiment, and automatically submit the corresponding experiment via sbatch.
+
+## Required Files
+
+* [submit_hpcc_experiment.py](src/submit_hpcc_experiment.py): main script, in repo already, no action required
+* [hpcc_exp_configs.csv](hpcc_exp_configs.csv): experiment configurations, one row per experiment. ```job_name```, ```gpu_type```, ```program_path``` and ```notes``` are obligatory columns. The rest of the columns correspond to the arguments one would like to pass to [experiment.py](./src/experiment.py) when running experiments
+  * Unrecognized arguments would cause the job to submit but fail very soon ([experiment.py](./src/experiment.py) does not recognize the arguments). 
+  * Unspecified arguments will be the default value
+  * Boolean options (e.g. ```--save_model```) will have TRUE or FALSE in the configs table. TRUE means the option will be passed to experiment.py and FALSE means not. 
+* sbatch_template.txt: template for creating each sbatch experiment. Here's how to obtain it: 
+  * Download [this file on our shared Google Drive Folder](https://drive.google.com/file/d/1BlaLsCrcsXz3VWQ276qfFfATt2sNr7x4/view?usp=sharing)
+  * Put the file under [tmp/](tmp/) folder.
+  * Change the email address for ```mail-user``` in line 9 and save
+
+## Instructions
+
 # Acknowledgements
 
 Special thanks to [Jie Tang](https://github.com/TJmask), some of whose [code logic for the same task](https://github.com/TJmask/Space-Health-Predicting) has been especially helpful in building this project; Jie's name will be included the docstring sections of the functions, wherever credit is due.
