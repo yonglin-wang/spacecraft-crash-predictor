@@ -268,7 +268,7 @@ Using the following command:
   ```shell script
   cd /spacecraft-crash-predictor
   ```
-**NOTE: Please make sure you are running the following in the ```/spacecraft-crash-predictor``` directory.
+NOTE: Please make sure you are running the following in the ```/spacecraft-crash-predictor``` directory.
 
 ### Step 3. Run the automated experiments
 
