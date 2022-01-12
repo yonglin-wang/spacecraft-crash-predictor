@@ -248,8 +248,56 @@ To reduce the time needed to run multiple experiment on HPCC using sbatch, we've
   * Download [this file on our shared Google Drive Folder](https://drive.google.com/file/d/1BlaLsCrcsXz3VWQ276qfFfATt2sNr7x4/view?usp=sharing)
   * Put the file under [tmp/](tmp/) folder.
   * Change the email address for ```mail-user``` in line 9 and save
+  * **NOTE: this file need to be downloaded and edited manually since .gitignore will automatically exclude the file 
 
 ## Instructions
+
+### Step 1. Edit [hpcc_exp_configs.csv](hpcc_exp_configs.csv) with the parameters desired
+
+**Make sure you have downloaded all the requied file and place them at the required directories. 
+
+Now, you may refer back to Step 1 in [Reproduce the best model](https://github.com/yonglin-wang/spacecraft-crash-predictor/tree/exp_auto_readme#reproduce-the-best-model) for specific parameter input. 
+
+Each row in ```.csv ``` indicates one experinment:
+* If you would like to run multiple experiments at once, you should append the parameter settings for the next experiment after the previous one(s). 
+* If you would like to run new experiments, you should replace the previous parameter settings. 
+
+### Step 2. Move to the right directory 
+Using the following command:
+  ```shell script
+  cd /spacecraft-crash-predictor
+  ```
+  
+### Step 3. Run the automated experiments
+
+Using the following command:
+  ```shell script
+  python src/submit_hpcc_experiment.py
+  ```
+You should see the terminal output looking like this:
+  ```shell script
+  =*-+=*-+=*-+=*-+=*-+Now processing experiment at row 8 (0-based index)...=*-+=*-+=*-+=*-+=*-+
+   formatted arguments: --window 1.5 --ahead 1.0 --configID 3 --model linear --crash_ratio 1 --normalize all --early_stop --save_model
+   echoing formatted args... --window 1.5 --ahead 1.0 --configID 3 --model linear --crash_ratio 1 --normalize all --early_stop --save_model
+   Command above finished with exit code
+  ```
+However, if you received output like the following:
+   ```shell script
+   sh: sbatch: command not found
+   Traceback (most recent call last):
+     File "/Users/mac/git/spacecraft-crash-predictor-1/src/submit_hpcc_experiment.py", line 144, in <module>
+       main()
+     File "/Users/mac/git/spacecraft-crash-predictor-1/src/submit_hpcc_experiment.py", line 44, in main
+       raise ValueError(f"exit code {exit_code} is not 0! exp_info_dict content: {exp_info_dict}")
+   ValueError: exit code 32512 is not 0! exp_info_dict content: OrderedDict([('job_name', 'sl-test'), ('gpu_type', 'TitanXP'), ('program_path', './src/experiment.py')
+   ```
+this indicates that you may enter the parameters incorrectly. Please go back to the [hpcc_exp_configs.csv](hpcc_exp_configs.csv) and reset your configurations. 
+
+Otherwise, if you are able to receive the final message, like the following:
+   ```shell script
+   [Final Message] Congrats! Successfully submitted 9 jobs!
+   ```
+Then, you are good to go!
 
 # Acknowledgements
 
