@@ -266,9 +266,9 @@ Each row in ```.csv ``` indicates one experinment:
 
 Using the following command:
   ```shell script
-  cd /spacecraft-crash-predictor
+  cd <path_to_project_root>
   ```
-NOTE: Please make sure you are running the following in the ```/spacecraft-crash-predictor``` directory.
+NOTE: Please make sure you are running the following in the project root directory (e.g. $WORK/spacecraft-crash-predictor/ if you cloned this repo to your work directory on HPCC).
 
 ### Step 3. Run the automated experiments
 
@@ -283,7 +283,7 @@ You should see the terminal output looking like this:
    echoing formatted args... --window 1.5 --ahead 1.0 --configID 3 --model linear --crash_ratio 1 --normalize all --early_stop --save_model
    Command above finished with exit code
   ```
-However, if you received output like the following:
+However, if you receive output like the following:
    ```shell script
    sh: sbatch: command not found
    Traceback (most recent call last):
@@ -293,7 +293,7 @@ However, if you received output like the following:
        raise ValueError(f"exit code {exit_code} is not 0! exp_info_dict content: {exp_info_dict}")
    ValueError: exit code 32512 is not 0! exp_info_dict content: OrderedDict([('job_name', 'sl-test'), ('gpu_type', 'TitanXP'), ('program_path', './src/experiment.py')
    ```
-this indicates that you may enter the parameters incorrectly. Please go back to the [hpcc_exp_configs.csv](hpcc_exp_configs.csv) and reset your configurations. 
+this indicates that you may have entered the parameters incorrectly (e.g. sbatch not installed, wrong parameter names, invalid parameter values, etc). Please go back to the [hpcc_exp_configs.csv](hpcc_exp_configs.csv) and double check your configurations. 
 
 Otherwise, if you are able to receive the final message, like the following:
    ```shell script
