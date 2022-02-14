@@ -10,12 +10,12 @@ Whenever a new feature is proposed:
 2. In [consts.py](consts.py), add the feature name and column path to ```COL_PATHs``` dictionary
 3. If a new, non-categorical feature has a range much larger than joystick's [-1, 1], e.g. position and velocity: this feature is a large value feature, and you should add its name to ```LARGE_VAL_FEATS``` in [consts.py](consts.py). In this way, the large features will be normalized to match joystick's range if a ```--normalize large``` option is specified.
 4. If the feature is categorical, e.g. destabilizing joystick deflection, add it to ```CATEGORICAL_FEATS``` in [consts.py](consts.py), since we crucially do NOT want to normalize them in any normalization mode.
-5. Add feature extraction function call as ```self._save_col(<function call and return>, <feature name>)``` in ```__init__``` method of [MARSDataLoader](processing/marsdataloader.py)
-6. When you initialize a new MARSDataLoader, it will automatically include the new feature.
+5. Add feature extraction function call as ```self.___save_new_feature(<function call and return>, <feature name>)``` in the if statement in ```__init__``` method of [MARSDataLoader](processing/marsdataloader.py)
+6. When you initialize a new MARSDataLoader, it will automatically scan and load the new feature; if the new feature file is not found, it will create it using the extraction call as specified in Step 5.
 
 ## Code for New Feature Combination (i.e. Configuration of Datasets used in Training)
 Whenever a new feature combination is proposed:
-1. Pick a unique intger ```n``` as your ```config_id```, e.g. ```100```, and put it in set ```CONFIG_IDS``` in [consts.py](consts.py)
+1. Pick a unique integer ```n``` as your ```config_id```, e.g. ```3```, and put it in set ```CONFIG_IDS``` in [consts.py](consts.py)
 
 2. Write the configuration function with name in format similar to ```_generate_config_<n>``` in [dataset_config.py](processing/dataset_config.py), which takes at least a ```MARSDataLoader``` object and returns a 6-tuple of numpy arrays ```train_inds```, ```test_inds```, ```X_train```, ```X_test```, ```y_train```, ```y_test```
 
@@ -53,7 +53,7 @@ Whenever a new model build has been proposed:
 
   Then, when you run ```experiment.py``` with ```--model <new model name>```, the new model will be used.
 
-- Other models: TBD! Note: if not a Keras model, saving methods such as ```model.save()``` may not be compatible. 
+- Other models types: TBD! Note: if not a Keras model, saving methods such as ```model.save()``` may not be compatible. 
 
 ## Code for New Experiment Option
 
