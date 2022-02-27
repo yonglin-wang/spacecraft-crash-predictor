@@ -68,7 +68,7 @@ def _get_recorder(exp_id: int, exp_parent_dir: str) -> Recorder:
     if not exp_dir_match:
         raise ValueError(f"Cannot find experiment folder for id {exp_id}")
     if len(exp_dir_match) > 1:
-        raise ValueError(f"More than 1 experiment folders found for id {exp_id}")
+        raise ValueError(f"More than 1 experiment folders found for id {exp_id}; regex pattern: {pat.pattern}")
     rec_path = os.path.join(exp_parent_dir, exp_dir_match[0], C.REC_BASENAME)
 
     # load recorder

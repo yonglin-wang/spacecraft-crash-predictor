@@ -239,8 +239,8 @@ CV_OPTIONS = [NO_CV, KFOLD, LEAVE_OUT]
 
 
 # experiment path
-EXP_PREF_PATTERN = "exp{}_" + DATA_SUBDIR + "_"
-EXP_FORMAT = os.path.join(EXP_PATH, EXP_PREF_PATTERN + "{}win_{}ahead_conf{}_{}")  # e.g.exp1_SupineMARS_1000win_500ahead_conf1_lstm"
+EXP_PREF_PATTERN = "exp{}_"
+EXP_FORMAT = os.path.join(EXP_PATH, EXP_PREF_PATTERN + DATA_SUBDIR + "_" + "{}win_{}ahead_conf{}_{}")  # e.g.exp1_SupineMARS_1000win_500ahead_conf1_lstm"
 
 # experiment directory path for each experiment
 RESULT_DIR = "results"
