@@ -3,11 +3,51 @@
 """Constants used in scripts. Crucially, to prevent circular import, this script does not import relative modules."""
 import os
 from collections import OrderedDict
+import sys
+import argparse
 
 import numpy as np
 
 
+
+# ----
+# Raw Data Path: Add name of the data subdir here!
+# ----
+
+# Assuming 1st sys.argv is the data subdir used for this run
+DATA_SUBDIR = sys.argv[1]
+
+# below is all the acceptable options of DATA_SUBDIR, will be validated by argparser
+SUPINE_MARS = "SupineMARS"
+UPRIGHT_MARS = "UprightMARS"
+# NORMAL_VIP  = "NormalVIP"
+# SCINT_VIP = "ScintillatingVIP"
+
+# DATA_SUBDIR_LIST = [SUPINE_MARS, UPRIGHT_MARS, NORMAL_VIP, SCINT_VIP]
+DATA_SUBDIR_LIST = [SUPINE_MARS, UPRIGHT_MARS]
+
+# ----
+# rand var
+# ----
+
 RANDOM_SEED = 2020
+
+# ----
+# standard argparser to be used
+# ----
+
+def create_template_argparser(parser_prog_name, description="") -> argparse.ArgumentParser:
+    """Argparser template. Must be used by all programs that reads from any files under data/"""
+    # noinspection PyTypeChecker
+    argparser = argparse.ArgumentParser(prog=parser_prog_name, description=description,
+                                        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    # add dataset name to the template to ensure sys.argv[1] is always dataset name
+    argparser.add_argument(
+        'dataset_name', type=str, choices=DATA_SUBDIR_LIST,
+        help='name of the subdir that contains the data_all.csv file.')
+
+    return argparser
 
 
 # -----
@@ -16,8 +56,7 @@ RANDOM_SEED = 2020
 SEGMENT_COLS = ['seconds', 'trialPhase', 'peopleName', 'peopleTrialKey']
 ID = "id"
 OUTPUT_COLS = ["duration", "reading_num", "phase", "crash_ind", "subject", "trial_key"]
-DATA_DIR = "data"
-os.makedirs(DATA_DIR, exist_ok=True)
+DATA_DIR = os.path.join("data", DATA_SUBDIR)
 
 SEGMENT_DICT_PATH = os.path.join(DATA_DIR, "segment_dict.pkl")
 SEGMENT_STATS_PATH = os.path.join(DATA_DIR, "segment_stats.csv")
@@ -200,14 +239,15 @@ CV_OPTIONS = [NO_CV, KFOLD, LEAVE_OUT]
 
 
 # experiment path
-EXP_PREF_PATTERN = "exp{}_"
-EXP_FORMAT = os.path.join(EXP_PATH, EXP_PREF_PATTERN + "{}win_{}ahead_conf{}_{}")  # e.g.exp1_1000win_500scale_conf1_lstm"
+EXP_PREF_PATTERN = "exp{}_" + DATA_SUBDIR + "_"
+EXP_FORMAT = os.path.join(EXP_PATH, EXP_PREF_PATTERN + "{}win_{}ahead_conf{}_{}")  # e.g.exp1_SupineMARS_1000win_500ahead_conf1_lstm"
 
 # experiment directory path for each experiment
 RESULT_DIR = "results"
 
 # path for saving predictions
-PRED_PATH = os.path.join(RESULT_DIR, "BestValPred_exp{}_{}win_{}ahead_conf{}_{}.csv")
+PRED_PATH = os.path.join(RESULT_DIR, DATA_SUBDIR + "_BestValPred_exp{}_{}win_{}ahead_conf{}_{}.csv")
+# name of prediction col in the output test set
 PRED_COL = "predicted"
 
 # path for normalization stats

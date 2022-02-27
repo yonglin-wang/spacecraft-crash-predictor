@@ -4,6 +4,9 @@ Research assisstants at Brandeis should refer to [Initial Set Up Instructions](h
 
 Please contact the repo owner (YW) if you need access to the document.
 
+## Important Assumptions
+1. [consts.py](consts.py) assumes that the first argument passed to the script (i.e. `sys.argv[1]`) is the name of the dataset subdirectory!
+
 ## Code for Extracting New Feature
 Whenever a new feature is proposed:
 1. Write its extraction function in [extract_features.py](processing/extract_features.py)

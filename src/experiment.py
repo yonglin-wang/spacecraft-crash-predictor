@@ -420,11 +420,9 @@ def print_split_info(inds_train, inds_test, X_train, X_test, y_train, y_test, cl
 
 
 def main():
-
     # Argparser
     # noinspection PyTypeChecker
-    argparser = argparse.ArgumentParser(prog="Experiment Argparser",
-                                        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    argparser = C.create_template_argparser("Experiment Argparser")
 
     # Preprocessing flags
     argparser.add_argument(

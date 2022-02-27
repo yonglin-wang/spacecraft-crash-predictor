@@ -297,9 +297,9 @@ def _find_nearest_value_idx(array: np.ndarray, value: float) -> Tuple[float, int
 def main():
     # command line parser
     # noinspection PyTypeChecker
-    parser = argparse.ArgumentParser(prog="predict.py",
-                                     description="Run saved model on the held out test set.",
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = C.create_template_argparser("Test-set Prediction Program",
+                                         description="Run saved model on the specified held out test set")
+
     parser.add_argument("exp_id",
                         type=int,
                         help="ID of the experiment to load saved model from")
