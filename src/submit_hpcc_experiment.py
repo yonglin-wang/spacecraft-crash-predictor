@@ -20,7 +20,7 @@ SHELL_SEP = "\n"
 
 def main():
     template = __load_file_template()
-    # by default, any names not in template is considered to be passed to the .py script
+    # assumes that any names not in template is considered to be passed to the .py script
     names_in_template = set(
         [field_name for _, field_name, _, _ in Formatter().parse(template) if field_name is not None])
 
@@ -111,8 +111,8 @@ def __process_boolean_options(exp_dict: OrderedDict) -> OrderedDict:
 
 def __generate_temporary_shell_script(template_txt: str, processed_exp_dict: OrderedDict) -> str:
     """generate and save the shell script to tmp folder. returns filled template """
-    assert EXP_PARAM_KEY in processed_exp_dict, f"code assumes dict is processed and has " \
-                                                f"{EXP_PARAM_KEY} key, which isn't found."
+    assert EXP_PARAM_KEY in processed_exp_dict, f"code assumes dict is processed and has the " \
+                                                f"'{EXP_PARAM_KEY}' key, which isn't found."
 
     shell_content = template_txt.format(**processed_exp_dict)
     with open(SH_FILE_PATH, "w") as file:

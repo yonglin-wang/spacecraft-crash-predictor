@@ -6,7 +6,7 @@
 import os
 import pickle
 from collections import OrderedDict
-from typing import Union, Tuple
+from typing import Union
 
 import pandas as pd
 import numpy as np

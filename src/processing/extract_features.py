@@ -7,15 +7,15 @@
 import os
 import time
 from typing import Union
+import random
+
 
 import pandas as pd
 import numpy as np
 import scipy as sp
 from scipy.interpolate import interp1d
-from sklearn.model_selection import StratifiedShuffleSplit
-
 from tqdm import tqdm
-import random
+
 
 from processing.split_data import _save_test_train_split
 from utils import calculate_exec_time
