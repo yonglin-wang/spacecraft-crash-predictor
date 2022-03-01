@@ -35,6 +35,7 @@ class Recorder():
         self.configID = self.train_args["configID"]
         self.exp_date = date.today().strftime("%B %d, %Y")
         self.using_seq_label = seq_y
+        self.dataset_name = C.DATA_SUBDIR
 
         # get unique experiment ID for current project folder
         self.exp_ID = int(_find_next_exp_ID())
@@ -320,8 +321,7 @@ class TestSetProcessor:
                 lookahead_destab_sustained_ico, lookahead_destab_sustained_eco
 
     def save_lookahead_windows(self, data_df: pd.DataFrame) -> pd.DataFrame:
-        """save lookahead windows of each entry in given DataFrame"""
-        # TODO where to put this? additional arg in predict.py?
+        """save lookahead windows of each entry in given DataFrame, effective if specified in predict.py args"""
         # output: [trial key, window_end], vel, pos, joystick,
         # locate lookahead sequences, note that first entry is last time step in input window
         lookahead_df_dict = {key:[] for key in [# "trial_key", "window_end",

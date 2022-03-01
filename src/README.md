@@ -77,3 +77,4 @@ However, if you'd still like to (e.g. due to bugs found in preprocessing code or
 - every visible file and directory under [data](../data/) except for ```data_all.csv```
 - every visible file and directory under [results/](../results/) except for the [template/](../results/template) folder
 - every visible file and directory under [exp/](../exp/)
+- change [results/.predIDs](../results/.predIDs) and [results/.expIDs](../results/.expIDs) both to 1

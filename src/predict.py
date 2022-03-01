@@ -116,7 +116,9 @@ def _save_prediction_results(res: dict, recorder: Recorder,
                 "gap": curr_loader.time_gap,
                 "config id": recorder.configID,
                 "decision threshold": threshold,
-                "recall for inferring threshold": recall_at if recall_at else "not specified"
+                "recall for inferring threshold": recall_at if recall_at else "not specified",
+                "test set name": C.DATA_SUBDIR,
+                "train set name": recorder.dataset_name
                 })
 
     # open results df and save results

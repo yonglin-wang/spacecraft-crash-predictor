@@ -66,6 +66,9 @@ In order to run the code properly, you'll need the raw data file ```data_all.csv
 
 ### Instructions
 
+*TODO from Yonglin: add this line somewhere*
+```Note that `SupineMARS` dataset will be used in this demonstration. You can also use other dataset names, as long as their data file exists at `data/<dataset name>/data_all.csv`.```
+
 1. Download the data from [this Google Drive link](https://drive.google.com/file/d/15SgiS-vImzaIZbw32i6Nmju_2d_lThS2/view?usp=sharing) (please contact repo owner for access). 
 2. Rename the downloaded file to ```data_all.csv``` if not already. 
 3. Put the file under [data/](data/) directory. After this step, the file should exist at  [data/data_all.csv](./data/data_all.csv).
@@ -74,12 +77,14 @@ In order to run the code properly, you'll need the raw data file ```data_all.csv
 
 In our experiment, we chose the stacked GRU model trained on 1000ms (1s) window size and 800ms time-in-advance (0.8s) as our best model for further result analysis. To train this model, use the commands describe in this section in the given order.
 
+Note that `SupineMARS` dataset will be used in this demonstration. You can also use other dataset names, as long as their data file exists at `data/<dataset name>/data_all.csv`.
+
 ### Step 1. Generate the dataset and train the model 
 
 using the following command:
 
 ```shell script
-./src/experiment.py --window 1.0 --ahead 0.8 \
+./src/experiment.py SupineMARS --window 1.0 --ahead 0.8 \
                    	--early_stop --cv_mode kfold --cv_splits 10 \
                    	--save_model \
                    	--configID 3 --normalize all --model gru-gru \
@@ -88,6 +93,7 @@ using the following command:
 
 where:
 
+* `SupineMARS`: name of the dataset used for training
 * ```--configID 3``` : use feature set containing {angular position: float, angular degree: float, joystick deflection: float, destabilizing joystick deflection: bool}
 * ```--normalize all```: normalize all non-categorical features, in this case: angular position, angular degree, joystick deflection.
 * ```--model gru-gru```: train a double-layer stacked GRU model; if you'd just like to test out the entire pipeline, change ```gru-gru``` to ```mlp``` to save time. 
@@ -95,8 +101,8 @@ where:
 
 After this process is done, you should expect the following files to be generated:
 
-* a folder containing preprocessed dataset for this window size and time-in-advance (i.e. ```ahead```) combination, named ```1000window_800ahead_200rolling```, will be created in [data/](./data/) among other auxiliary files. 
-* The best performing model during the 10-fold CV for this experiment saved at [exp/](./exp) folder, named similar to ```exp1_1.0win_0.8ahead_conf3_gru-gru```, including the tensorflow model file and a customized experiment recorder object. ```exp1``` indicates that the experiment ID is 1. 
+* a folder containing preprocessed dataset for this window size and time-in-advance (i.e. ```ahead```) combination, named ```1000window_800ahead_200rolling```, will be created in [data/SupineMARS](./data/SupineMARS) among other auxiliary files. 
+* The best performing model during the 10-fold CV for this experiment saved at [exp/](./exp) folder, named similar to ```exp1_SupineMARS_1000win_800ahead_conf1_gru-gru```, including the tensorflow model file and a customized experiment recorder object. ```exp1``` indicates that the experiment ID is 1. 
 * ```exp_ID_config.csv``` and ```exp_results_all.csv``` under [results/](./results/) folder, the former with the configuration of all the experiments and the latter with CV mean and std for various evaluation metrics, both indexed by experiment ID. 
 
 #### But I just wanna run a quick test!
@@ -104,7 +110,7 @@ After this process is done, you should expect the following files to be generate
 OK, try this 1 epoch, no CV, command that trains a linear model: 
 
 ```shell script
-./src/experiment.py --pbar --window 1.0 --ahead 0.8 --max_epoch 1 --cv_mode disable --save_model --configID 1 --model linear --notes "testing only: linear no CV"
+./src/experiment.py SupineMARS --pbar --window 1.0 --ahead 0.8 --max_epoch 1 --cv_mode disable --save_model --configID 1 --model linear --notes "testing only: linear no CV"
 ```
 
 Note that if you don't have a preprocessed ```--window 1.0 --ahead 0.8``` dataset, it will take ~20-40min to create the dataset, depending on your hardware. 
@@ -124,11 +130,12 @@ Follow the standard output to locate the merged file, which, if no duplicate fil
 To evaluate the model on the test set and generate test set predictions for analysis, run:
 
 ```shell script
-./src/predict.py <YOUR EXP NUMBER> --save_preds_csv --save_lookahead_windows --at_recall 0.95
+./src/predict.py SupineMARS <YOUR EXP NUMBER> --save_preds_csv --save_lookahead_windows --at_recall 0.95
 ```
 
 where:
 
+* `SupineMARS`: name of the dataset used for test; note that it does NOT have to be the same as the training test, e.g. you can train on `SupineMARS` and test on `UprightMARS`
 * ```<YOUR EXP NUMBER>``` corresponds to the exp# for the model saved at [exp/](./exp) folder. If this is your first time running this program, it should be ```1```. 
 * ```--save_preds_csv```: save all the test set input data windows and their predictions
 * ```--save_lookahead_windows```: save the features in the time-in-advance duration corresponding to each input sliding window, i.e. between ```endtime_of_sliding_window``` and ```endtime_of_sliding_window + time_in_advance_duration```. We use these features to perform error analysis, e.g. savable crashes.
@@ -143,22 +150,24 @@ After this process is done, you should expect the following files to be generate
 
 You can skip this section if you only wish to recreate the best model, which you should be able to obtain by following the previous section. 
 
+As above, we'll use `SupineMARS` dataset for demonstration purposes, but you can choose any dataset, as long as it follows [Dataset Requirement](#dataset-requirement).
+
 ## Run CV Training Experiments
 
 ```./src/experiment.py``` runs an experiment pipeline, which puts together preprocessing, modeling, evaluation, and logging. 
 
-Under project root, run ```$ ./src/experiment.py -h``` to see all available arguments. 
+Under project root, run ```$ ./src/experiment.py -h``` to see all available arguments.
 
 - Example 1: running the all default options
 
   ```shell script
-  ./src/experiment.py
+  ./src/experiment.py SupineMARS
   ```
 
 - Example 2: template for tweaking most of the parameters; note that the last 3 lines are usually held the same during the experiments, and the last 2 lines are default values that can be left out of the arguments.
 
   ```shell script
-  ./src/experiment.py --window 1.0 --ahead 0.8 --rolling 0.2 \
+  ./src/experiment.py SupineMARS --window 1.0 --ahead 0.8 --rolling 0.2 \
                       --model gru --normalize all --crash_ratio 1 --configID 3 \
                       --notes "gru-def: +destablize, +norm all, gru save_model" \
                       --early_stop --save_model \
@@ -170,7 +179,7 @@ Under project root, run ```$ ./src/experiment.py -h``` to see all available argu
 - Example 3: if working on an interactive shell, add ```--pbar``` to show progress bar
 
   ```shell script
-  ./src/experiment.py --pbar <other arguments>
+  ./src/experiment.py SupineMARS --pbar <other arguments>
   ```
 
 ## Evaluate Saved Model on Held-out Test Sets
@@ -185,18 +194,18 @@ You'll need to specify the id of the experiment (found under ```Experiment ID```
 For example, if we want to evaluate the model saved from Experiment 206 (i.e. ```Experiment ID```=206) and save the held-out test set predictions as csv files, use
 
 ```shell script
-./src/predict.py 206 --save_preds_csv
+./src/predict.py SupineMARS 206 --save_preds_csv
 ```
 
 To evaluate the models at a different recall such as 0.99 (i.e. evaluate with the decision threshold that yields 0.99 recall), use
 
 ```shell script
-./src/predict.py 206 --save_preds_csv --at_recall 0.99
+./src/predict.py SupineMARS 206 --save_preds_csv --at_recall 0.99
 ```
 
 If you'd like to evaluate the model from Experiment 206 on a test set of a different time ahead for testing model rigidity, e.g. 0.7s (700ms) ahead, specify that time with:
 ```shell script
-$ .src/predict.py 206 --ahead 0.7
+$ .src/predict.py SupineMARS 206 --ahead 0.7
 ```
 Note that if the dataset with the new time ahead does not exist, the program will automatically generate the dataset before evaluating the model.
 
@@ -231,7 +240,7 @@ The following command allows you to join ```exp_results_all.csv``` (left) and  `
 
 To avoid overwriting existing merged files, an integer will be appended at the end of the output file
 
-# Automated Experiments
+# HPCC Users: Automated Experiments
 
 **NOTE: this section is only for people with an HPCC account AND access to the lab's shared Google Drive**
 
@@ -245,7 +254,7 @@ To reduce the time needed to run multiple experiment on HPCC using sbatch, we've
   * Unspecified arguments will be the default value
   * Boolean options (e.g. ```--save_model```) will have TRUE or FALSE in the configs table. TRUE means the option will be passed to experiment.py and FALSE means not. 
 * sbatch_template.txt: template for creating each sbatch experiment. Here's how to obtain it: 
-  * Download [this file on our shared Google Drive Folder](https://drive.google.com/file/d/1BlaLsCrcsXz3VWQ276qfFfATt2sNr7x4/view?usp=sharing)
+  * Download [this file on our shared Google Drive Folder](https://drive.google.com/file/d/1XNKvnItNIgYCHmyhN-GSZkJAu29VhuES/view?usp=sharing)
   * Put the file under [tmp/](tmp/) folder.
   * Change the email address for ```mail-user``` in line 9 and save
   * **NOTE: this file need to be downloaded and edited manually since .gitignore will automatically exclude the file 
@@ -301,8 +310,5 @@ Otherwise, if you are able to receive the final message, like the following:
    ```
 Then, you are good to go!
 
-# Acknowledgements
-
-Special thanks to [Jie Tang](https://github.com/TJmask), some of whose [code logic for the same task](https://github.com/TJmask/Space-Health-Predicting) has been especially helpful in building this project; Jie's name will be included the docstring sections of the functions, wherever credit is due.
-
-For tips on adding new models or new features, please see [src folder's README](https://github.com/yonglin-wang/spacecraft-crash-predictor/blob/main/src/README.md)
+# Dev Tips
+For tips on adding new models and new features, etc., please see [src folder's README](https://github.com/yonglin-wang/spacecraft-crash-predictor/blob/main/src/README.md)

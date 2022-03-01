@@ -259,6 +259,7 @@ EXP_ID_LOG = os.path.join(RESULT_DIR, "exp_ID_config.csv")
 TEMPLATE_ID_LOG = os.path.join(RESULT_DIR, "template", "exp_ID_config.csv")
 EXP_ID_COL = "exp_ID"
 EXP_COL_CONV = OrderedDict([('exp_ID', 'experiment ID'),
+                            ('dataset_name', 'dataset name'),
                             ('configID', 'dataset config ID'),
                             ('window_ms', 'window size (ms)'),
                             ('ahead_ms', 'time ahead (ms)'),
