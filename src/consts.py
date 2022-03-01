@@ -309,7 +309,7 @@ SPLIT_MODES = [KFOLD, LEAVE_OUT, NO_CV]
 # Summary Constants
 # -----
 COMBINED_FILE_FORMAT = os.path.join(RESULT_DIR, "hpcc_results{}.csv")
-DATASET_STATS_FORMAT = os.path.join(RESULT_DIR, "dataset_stats{}.csv")
+DATASET_STATS_FORMAT = "dataset_stats{}.csv"
 DATASET_PATTERN = "^" + DATA_OUT_DIR_FORMAT_BASE.format(r"(\d+)", r"(\d+)", r"(\d+)")
 DEBUG_PATTERN = "^" + DEBUG_FORMAT.format(r"\d+", r"\d+")
 

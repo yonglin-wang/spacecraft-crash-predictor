@@ -173,8 +173,8 @@ def main():
         '--merge', action='store_true',
         help='whether to merge results and experiment configuration files')
     argparser.add_argument(
-        '--dataset', action='store_true',
-        help='whether to summarize dataset stats (e.g. total samples, train-test split sizes, crash-noncrash ratios, etc.)')
+        '--dataset_path', type=str,
+        help='whether to summarize dataset stats (e.g. total samples, train-test split sizes, crash-noncrash ratios, etc.); requires specifying dataset directory path that immediately contains the data_all.csv file')
     argparser.add_argument(
         '--silent', action='store_true',
         help='whether to disable console output')
@@ -184,8 +184,12 @@ def main():
     if args.merge:
         merge_results(verbose=not args.silent)
 
-    if args.dataset:
-        generate_dataset_stats(C.DATA_DIR, __find_next_available_filename(C.DATASET_STATS_FORMAT), verbose=not args.silent)
+    if args.dataset_path:
+        if not os.path.exists(args.dataset_path):
+            raise ValueError(f"Cannot find dataset directory at {args.dataset_path}")
+        elif not os.path.isdir(args.dataset_path):
+            raise ValueError(f"{args.dataset_path} exists but is NOT a directory.")
+        generate_dataset_stats(args.dataset_path, __find_next_available_filename(os.path.join(args.dataset_path, C.DATASET_STATS_FORMAT)), verbose=not args.silent)
 
 
 if __name__ == "__main__":

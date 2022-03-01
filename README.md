@@ -234,11 +234,22 @@ Each experiment will be indexed with a unique ID number. The two tables can be j
 
 The following command allows you to join ```exp_results_all.csv``` (left) and  ```exp_ID_config.csv``` (right) on ```experiment ID``` column and save the combined table to ```hpcc_results.csv```. 
 
+
 ```bash
 ./src/summary.py --merge
 ```
 
 To avoid overwriting existing merged files, an integer will be appended at the end of the output file
+
+### Printing Dataset Statistics
+
+To summarize dataset stats (e.g. total samples, train-test split sizes, crash-noncrash ratios, etc.) of a specific dataset, e.g. SupineMARS, use `--dataset_path` and specify the path to dataset directory:
+
+```shell
+./src/summary.py --dataset_path data/SupineMARS
+```
+
+Then, you can find a new file at [data/SupineMARS/dataset_stats.csv](data/SupineMARS/dataset_stats.csv) containing all the stats.
 
 # HPCC Users: Automated Experiments
 
