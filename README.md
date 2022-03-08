@@ -64,14 +64,28 @@ These are the exact steps I used to install the exact versions listed above:
 
 In order to run the code properly, you'll need the raw data file ```data_all.csv.zip```, which contains at least all the columns listed in ```ESSENTIAL_RAW_COLS``` in [consts.py](src/consts.py).
 
-### Instructions
+### Instructions(Dataset)
 
-*TODO from Yonglin: add this line somewhere*
-```Note that `SupineMARS` dataset will be used in this demonstration. You can also use other dataset names, as long as their data file exists at `data/<dataset name>/data_all.csv.zip`.```
+1. Download the data from [this Google Drive link](https://drive.google.com/drive/folders/1vKRGvyq-vcICy5moTjkdT1lydyQ4myxQ?usp=sharing) (please contact repo owner for access). 
+2. Go to your desired ```dataset_name``` folder and download data, which should be a file that ends in `.csv.zip`.
+3. Rename the downloaded file to ```data_all.csv.zip``` if not already. 
+4. In the [data/](data/) directory, create a new folder called ```dataset_name``` and put the file under [data/dataset_name] directory. After this step, the file should exist at  [data/dataset_name/data_all.csv](./data/dataset_name/data_all.csv).
+>Note that `SupineMARS` dataset will be used in this demonstration. You can also use other dataset names, as long as their data file exists at `data/<dataset_name>/data_all.csv.zip`.
 
-1. Download the data from [this Google Drive link](https://drive.google.com/file/d/15SgiS-vImzaIZbw32i6Nmju_2d_lThS2/view?usp=sharing) (please contact repo owner for access). 
-2. Rename the downloaded file to ```data_all.csv.zip``` if not already. 
-3. Put the file under [data/](data/) directory. After this step, the file should exist at  [data/data_all.csv.zip](./data/data_all.csv.zip).
+### Instructions(Changes in [consts.py](src/consts.py).)
+When added new dataset, you'll need to make changes in [consts.py](src/consts.py). in order to run the code properly. 
+
+1. Open [consts.py](src/consts.py), below ```SUPINE_MARS = "SupineMARS"```, you should add new code as: 
+
+
+```shell script
+   <DATASET_NAME> = " DATASET_NAME "
+```
+2. Update the current ```DATA_SUBDIR_LIST = [SUPINE_MARS, UPRIGHT_MARS]``` to include the new `DATASET_NAME`, i.e.
+
+```shell script
+   DATA_SUBDIR_LIST = [SUPINE_MARS, UPRIGHT_MARS, DATASET_NAME]
+```
 
 # Reproduce the Best Model
 
