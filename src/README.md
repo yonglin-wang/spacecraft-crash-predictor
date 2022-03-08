@@ -74,7 +74,7 @@ The code has been organized in a way that additional experiment options and eval
 
 However, if you'd still like to (e.g. due to bugs found in preprocessing code or model output), clear the following directories:
 
-- every visible file and directory under [data](../data/) except for ```data_all.csv```
+- every visible file and directory under [data](../data/) except for ```data_all.csv.zip```
 - every visible file and directory under [results/](../results/) except for the [template/](../results/template) folder
 - every visible file and directory under [exp/](../exp/)
 - change [results/.predIDs](../results/.predIDs) and [results/.expIDs](../results/.expIDs) both to 1

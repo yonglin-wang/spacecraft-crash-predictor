@@ -45,7 +45,7 @@ def create_template_argparser(parser_prog_name, description="") -> argparse.Argu
     # add dataset name to the template to ensure sys.argv[1] is always dataset name
     argparser.add_argument(
         'dataset_name', type=str, choices=DATA_SUBDIR_LIST,
-        help='name of the subdir that contains the data_all.csv file.')
+        help='name of the subdir that contains the data_all.csv.zip file.')
 
     return argparser
 
@@ -64,7 +64,7 @@ SEGMENT_STATS_PATH = os.path.join(DATA_DIR, "segment_stats.csv")
 # -----
 # Feature extraction Constants
 # -----
-RAW_DATA_PATH = os.path.join(DATA_DIR, "data_all.csv")
+RAW_DATA_PATH = os.path.join(DATA_DIR, "data_all.csv.zip")
 ESSENTIAL_RAW_COLS = ['seconds', 'trialPhase', 'currentPosRoll', 'currentVelRoll', 'calculated_vel', 'joystickX',
                       'peopleName', 'peopleTrialKey']
 

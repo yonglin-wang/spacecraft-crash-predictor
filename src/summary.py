@@ -174,7 +174,7 @@ def main():
         help='whether to merge results and experiment configuration files')
     argparser.add_argument(
         '--dataset_path', type=str,
-        help='whether to summarize dataset stats (e.g. total samples, train-test split sizes, crash-noncrash ratios, etc.); requires specifying dataset directory path that immediately contains the data_all.csv file')
+        help='whether to summarize dataset stats (e.g. total samples, train-test split sizes, crash-noncrash ratios, etc.); requires specifying dataset directory path that immediately contains the data_all.csv.zip file')
     argparser.add_argument(
         '--silent', action='store_true',
         help='whether to disable console output')

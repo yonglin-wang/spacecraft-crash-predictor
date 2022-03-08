@@ -62,22 +62,22 @@ These are the exact steps I used to install the exact versions listed above:
 
 ## Dataset Requirement
 
-In order to run the code properly, you'll need the raw data file ```data_all.csv```, which contains at least all the columns listed in ```ESSENTIAL_RAW_COLS``` in [consts.py](src/consts.py).
+In order to run the code properly, you'll need the raw data file ```data_all.csv.zip```, which contains at least all the columns listed in ```ESSENTIAL_RAW_COLS``` in [consts.py](src/consts.py).
 
 ### Instructions
 
 *TODO from Yonglin: add this line somewhere*
-```Note that `SupineMARS` dataset will be used in this demonstration. You can also use other dataset names, as long as their data file exists at `data/<dataset name>/data_all.csv`.```
+```Note that `SupineMARS` dataset will be used in this demonstration. You can also use other dataset names, as long as their data file exists at `data/<dataset name>/data_all.csv.zip`.```
 
 1. Download the data from [this Google Drive link](https://drive.google.com/file/d/15SgiS-vImzaIZbw32i6Nmju_2d_lThS2/view?usp=sharing) (please contact repo owner for access). 
-2. Rename the downloaded file to ```data_all.csv``` if not already. 
-3. Put the file under [data/](data/) directory. After this step, the file should exist at  [data/data_all.csv](./data/data_all.csv).
+2. Rename the downloaded file to ```data_all.csv.zip``` if not already. 
+3. Put the file under [data/](data/) directory. After this step, the file should exist at  [data/data_all.csv.zip](./data/data_all.csv.zip).
 
 # Reproduce the Best Model
 
 In our experiment, we chose the stacked GRU model trained on 1000ms (1s) window size and 800ms time-in-advance (0.8s) as our best model for further result analysis. To train this model, use the commands describe in this section in the given order.
 
-Note that `SupineMARS` dataset will be used in this demonstration. You can also use other dataset names, as long as their data file exists at `data/<dataset name>/data_all.csv`.
+Note that `SupineMARS` dataset will be used in this demonstration. You can also use other dataset names, as long as their data file exists at `data/<dataset name>/data_all.csv.zip`.
 
 ### Step 1. Generate the dataset and train the model 
 
