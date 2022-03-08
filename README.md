@@ -79,7 +79,7 @@ When adding a new dataset, you'll also need to make changes in [consts.py](src/c
 
 
 ```shell script
-   <DATASET_NAME> = " DATASET_NAME "
+   <DATASET_NAME> = "<name for new dataset>"    # e.g. NORMAL_VIP  = "NormalVIP"
 ```
 2. Update the current ```DATA_SUBDIR_LIST = [SUPINE_MARS, UPRIGHT_MARS]``` to include the new `DATASET_NAME`, i.e.
 
