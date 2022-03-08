@@ -104,7 +104,15 @@ def _clean_metadata(meta_df: pd.DataFrame) -> pd.DataFrame:
     meta_df = meta_df[meta_df.phase == 3]
     # locate buggy indices. current condition: single-reading human episodes and their corresponding crashes
     buggy_human_segs = meta_df[meta_df.reading_num <= C.MIN_ENTRIES_IN_WINDOW].index
-    assert len(buggy_human_segs) == 16
+
+    # different datasets have different numbers of buggy datasets
+    if C.DATA_SUBDIR == C.SUPINE_MARS:
+        assert len(buggy_human_segs) == 16
+    elif C.DATA_SUBDIR == C.UPRIGHT_MARS:
+        # upright dataset is better, min 26 readings in one segment, max 4773
+        assert not len(buggy_human_segs)
+    else:
+        raise ValueError("Set debugger to this line and inspect meta_df.reading_num.describe(). Then, use assertion to ensure the expected buggy segment length.")
 
     return meta_df.drop(meta_df[meta_df.index.isin(set(buggy_human_segs))].index)
 
