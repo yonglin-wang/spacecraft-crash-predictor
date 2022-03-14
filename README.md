@@ -69,7 +69,7 @@ In order to run the code properly, you'll need the raw data file ```data_all.csv
 1. Download the data from [this Google Drive link](https://drive.google.com/drive/folders/1vKRGvyq-vcICy5moTjkdT1lydyQ4myxQ?usp=sharing) (please contact repo owner for access). 
 2. Go to your desired ```dataset_name``` folder and download data, which should be a file that ends in `.csv.zip`.
 3. Rename the downloaded file to ```data_all.csv.zip``` if not already. 
-4. In the [data/](data/) directory, create a new folder called ```dataset_name``` and put the file under [data/dataset_name] directory. After this step, the file should exist at  [data/dataset_name/data_all.csv](./data/dataset_name/data_all.csv).
+4. In the [data/](data/) directory, create a new folder called ```dataset_name``` and put the file under [data/dataset_name] directory. After this step, the file should exist at  [data/dataset_name/data_all.csv.zip](./data/dataset_name/data_all.csv.zip).
 >Note that `SupineMARS` dataset will be used in this demonstration. You can also use other dataset names, as long as their data file exists at `data/<dataset_name>/data_all.csv.zip`.
 
 ### Instructions for Changes in [consts.py](src/consts.py)
