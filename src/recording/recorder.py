@@ -164,7 +164,7 @@ class Recorder():
             true_df.to_csv(true_preds_path, index=False)
             print(f"saved {len(true_df)} true/correct predictions to {true_preds_path}")
             false_df.to_csv(false_preds_path, index=False)
-            print(f"saved {len(false_df)} true/correct predictions to {false_preds_path}")
+            print(f"saved {len(false_df)} false/incorrect predictions to {false_preds_path}")
             print(f"accuracy (for debugging): {len(true_df)/(len(true_df) + len(false_df))}")
         else:
             test_df.to_csv(self.pred_path, index=False)
