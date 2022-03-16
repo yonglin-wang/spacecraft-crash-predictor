@@ -116,11 +116,15 @@ class Recorder():
                          true_preds_path: str="",
                          false_preds_path: str="",
                          custom_ahead: float=None,
-                         save_lookahead_windows=False) -> None:
+                         save_lookahead_windows=False,
+                         test_loader: MARSDataLoader=None) -> None:
         """save prediction for specified rows; separate files will be generated if no sequence label used and true and
         false pred paths are given."""
         # generate test DataFrame
-        test_df = generate_all_feat_df(self.loader, self.configID, inds=test_inds)
+        if test_loader is None:
+            # use original loader from the recorder if no test loader is specified
+            test_loader = self.loader
+        test_df = generate_all_feat_df(test_loader, self.configID, inds=test_inds)
 
         # append predictions
         if y_pred.ndim <=2:

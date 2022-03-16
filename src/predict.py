@@ -143,7 +143,8 @@ def _save_test_predictions(pred_id: int,
                            test_inds: np.ndarray,
                            save_npz: bool=False,
                            save_csv: bool=True,
-                           save_lookahead_windows: bool=False
+                           save_lookahead_windows: bool=False,
+                           test_loader: MARSDataLoader=None
                            ):
     """Save test set predictions (inputs, probabilities, predicted labels, true labels)"""
 
@@ -181,7 +182,7 @@ def _save_test_predictions(pred_id: int,
     if save_csv:
         recorder.save_predictions(test_inds, y_pred, true_preds_path=true_path,
                                   false_preds_path=false_path, custom_ahead=test_ahead,
-                                  save_lookahead_windows=save_lookahead_windows)
+                                  save_lookahead_windows=save_lookahead_windows, test_loader=test_loader)
 
 
 def _infer_decision_threshold(y_proba: np.ndarray,
@@ -253,7 +254,7 @@ def run_prediction(args: argparse.Namespace):
     if args.save_preds_csv or args.save_preds_npz:
         # save the actual predictions for each data, if needed
         _save_test_predictions(pred_ID, X_test, y_test, y_proba, y_pred, exp_recorder, args.ahead, threshold, sample_inds,
-                               save_npz=args.save_preds_npz, save_csv=args.save_preds_csv, save_lookahead_windows=args.save_lookahead_windows)
+                               save_npz=args.save_preds_npz, save_csv=args.save_preds_csv, save_lookahead_windows=args.save_lookahead_windows, test_loader=current_dataset_loader)
 
 
 def compute_test_eval_results(y_pred, y_true, y_proba, eval_res):
