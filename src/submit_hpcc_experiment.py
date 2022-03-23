@@ -34,7 +34,7 @@ def main():
     configs = pd.read_csv("hpcc_exp_configs.csv")
 
     # give a rough estimate of when program will end
-    print(f"Total {len(configs)} experiments to be run, taking approxiamtely {SLEEP_SEC * len(configs)} seconds.")
+    print(f"Total {len(configs)} experiments to be run, taking approximately {SLEEP_SEC * len(configs)} seconds.")
 
     for i, row in configs.iterrows():
         print("\n" + "=*-+" * 5 + f"Now processing experiment at row {i + 1}/{len(configs)}..." + "=*-+" * 5)
