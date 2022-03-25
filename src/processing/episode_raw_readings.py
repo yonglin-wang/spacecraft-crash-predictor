@@ -112,7 +112,8 @@ def _clean_metadata(meta_df: pd.DataFrame) -> pd.DataFrame:
         # upright dataset is better, min 26 readings in one segment, max 4773
         assert not len(buggy_human_segs)
     else:
-        raise ValueError("Set debugger to this line and inspect meta_df.reading_num.describe(). Then, use assertion to ensure the expected buggy segment length.")
+        raise ValueError(f"Found {len(buggy_human_segs)} buggy segments (segments with no more than {C.MIN_ENTRIES_IN_WINDOW} readings). "
+                         f"Please modify the if-statements here using assertion to ensure the expected buggy segment length for the corresponding dataset.")
 
     return meta_df.drop(meta_df[meta_df.index.isin(set(buggy_human_segs))].index)
 
