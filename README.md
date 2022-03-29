@@ -4,6 +4,10 @@ This project aims to build a classifier that predicts potential spacecraft crash
 
 This work is part of a project accepted by NASA/TRISH's GoForLaunch program, with a greater aim to enhance human performance in space flights and postural balancing tasks. For details, see [Dr. Vimal's project description and research roadmap](https://sites.google.com/view/vivekanandpandeyvimal/research_2/current-research?authuser=0#h.on5o56f1ne5m). The project is the collaboration between the Neuroscience and CS departments at Brandeis University. 
 
+# Publication
+
+This repository contains the code we used to run experiments in our Frontiers publication in 2022: [Crash Prediction Using Deep Learning in a Disorienting Spaceflight Analog Balancing Task](https://www.frontiersin.org/articles/10.3389/fphys.2022.806357/full)
+
 # Requirements
 
 ## General Package Requirement
