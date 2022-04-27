@@ -1,1 +1,1 @@
-prediction ID,train set name,test set name,experiment ID,window,train ahead,pred ahead,rolling,gap,config id,decision threshold,recall for inferring threshold,auc_sklearn,precision,recall,accuracy,f1,tn,fp,fn,tp,total,crash_size,noncrash_size,P@85R,P@90R,P@95R,P@99R
+prediction ID,train set name,test set name,experiment ID,window,train ahead,pred ahead,rolling,gap,config id,decision threshold,recall for inferring threshold,auc_sklearn,precision,recall,accuracy,f1,tn,fp,fn,tp,total,crash_size,noncrash_size

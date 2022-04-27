@@ -234,17 +234,17 @@ def run_prediction(args: argparse.Namespace):
     model = _load_model(exp_recorder.model_path)
 
     # get results
-    eval_res = model.evaluate(X_test, y_test, return_dict=True, verbose=verbose)
     y_proba = model.predict(X_test)
 
     # determine decision threshold for converting probability to labels
     default_threshold = exp_recorder.train_args["threshold"]
-    threshold = _infer_decision_threshold(y_proba, y_test, default_threshold, results_at_recall=args.at_recall)
+    threshold = _infer_decision_threshold(exp_recorder.best_y_proba, exp_recorder.best_y_true,
+                                          default_threshold, results_at_recall=args.at_recall)
     y_pred = y_proba.copy()
     y_pred[y_pred >= threshold] = 1
     y_pred[y_pred < threshold] = 0
 
-    all_res = compute_test_eval_results(y_pred, y_test, y_proba, eval_res)
+    all_res = compute_test_eval_results(y_pred, y_test, y_proba)
 
     print(f"Evaluation results at {threshold} decision threshold: {all_res}")
 
@@ -256,8 +256,10 @@ def run_prediction(args: argparse.Namespace):
         _save_test_predictions(pred_ID, X_test, y_test, y_proba, y_pred, exp_recorder, args.ahead, threshold, sample_inds,
                                save_npz=args.save_preds_npz, save_csv=args.save_preds_csv, save_lookahead_windows=args.save_lookahead_windows, test_loader=current_dataset_loader)
 
+    print(f"Prediction result #{pred_ID} saved succesfully!")
 
-def compute_test_eval_results(y_pred, y_true, y_proba, eval_res):
+
+def compute_test_eval_results(y_pred, y_true, y_proba):
     """helper function to compute and return dictionary containing all results"""
     tn, fp, fn, tp = confusion_matrix(y_true.flatten(), y_pred.flatten()).ravel()
 
@@ -269,10 +271,6 @@ def compute_test_eval_results(y_pred, y_true, y_proba, eval_res):
                 "fn": int(fn),
                 "tp": int(tp),
                 "auc_sklearn": roc_auc_score(y_true.flatten(), y_proba.flatten()),
-                C.PAT85R: eval_res[C.PAT85R],
-                C.PAT90R: eval_res[C.PAT90R],
-                C.PAT95R: eval_res[C.PAT95R],
-                C.PAT99R: eval_res[C.PAT99R],
                 "accuracy": accuracy_score(y_true, y_pred),
                 "precision": precision_score(y_true, y_pred),
                 "recall": recall_score(y_true, y_pred)

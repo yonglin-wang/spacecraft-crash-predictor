@@ -66,6 +66,7 @@ class Recorder():
         self.average_epochs: float = 0
         self.std_epochs: float = 0
         self.best_split: int = -1     # index of the best performing split, 0-based
+        self.best_y_proba, self.best_y_true = None, None    # for inferring threshold during eval
 
         if self.verbose:
             print("Now recording experiment #{}".format(self.exp_ID))
@@ -75,6 +76,8 @@ class Recorder():
                           time_taken: str,
                           epoch_list: list,
                           best_split: int,
+                          best_y_proba: np.ndarray,
+                          best_y_true: np.ndarray,
                           model: Sequential = None,
                           norm_stats: dict = None,
                           train_history: list = None,
@@ -87,6 +90,8 @@ class Recorder():
         self.std_epochs = float(np.std(epoch_list))
         self.best_split = best_split
         self.time_taken = time_taken
+        self.best_y_true = best_y_true
+        self.best_y_proba = best_y_proba
 
         # create new path in results and experiment folders
         if not os.path.exists(self.exp_dir):
