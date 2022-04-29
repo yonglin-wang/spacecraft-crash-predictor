@@ -112,6 +112,11 @@ EXTRACT_LOG_NAME = "feature_extraction"
 # DataLoader Constants
 # -----
 
+# race condition sleep
+RACE_CONDITION_SLEEP_INTERVAL = 20      # check if race condition is resolved every 20 seconds
+RACE_CONDITION_DISPLAY_INTERVAL = 60    # display waiting every 1 min
+RACE_CONDITION_TIMEOUT_INTERVAL = 3600  # time out after an hour of waiting (shouldn't take this long)
+
 # velocity mode tag
 CALCULATED = "calc"
 ORIGINAL = "orig"
