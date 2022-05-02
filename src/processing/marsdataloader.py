@@ -111,7 +111,7 @@ class MARSDataLoader():
                         print(f"Waited for {total_sleep_secs/60:.0f} minutes, still waiting...")
 
                     # time out after 1 hour (Supine takes 20min and is the largest dataset) to prevent wasting resources
-                    if total_sleep_secs >= C.RACE_CONDITION_SLEEP_INTERVAL:
+                    if total_sleep_secs >= C.RACE_CONDITION_TIMEOUT_INTERVAL:
                         raise RuntimeError(f"Waited for {total_sleep_secs/60:.0f} minutes, program timed out. Please "
                                            f"check if the preprocessed has finished and if so try running this process "
                                            f"again.")
