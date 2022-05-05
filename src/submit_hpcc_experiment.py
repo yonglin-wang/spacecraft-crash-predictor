@@ -3,11 +3,12 @@
 # Date: 1/4/22 1:55 PM
 # Automation script for submitting multiple HPCC jobs. Does NOT depend on any other scripts.
 
-import argparse
+
 from typing import Set
 import os
 from string import Formatter
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict
+import time
 
 import pandas as pd
 
@@ -16,18 +17,27 @@ SH_TEMPLATE_PATH = "tmp/sbatch_template.txt"
 SH_FILE_PATH = "tmp/sbatch_script.sh"
 EXP_PARAM_KEY = "exp_param_string"
 SHELL_SEP = "\n"
+SLEEP_SEC = 2
 
 
 def main():
     template = __load_file_template()
-    # by default, any names not in template is considered to be passed to the .py script
+    # assumes that any names not in template is considered to be passed to the .py script
     names_in_template = set(
         [field_name for _, field_name, _, _ in Formatter().parse(template) if field_name is not None])
 
+    # print sleep information
+    print(f"To prevent concurrent access to results/.expID, "
+          f"a sleep period of {SLEEP_SEC} seconds will be added between initiating each process.")
+
     # process and execute exp config
     configs = pd.read_csv("hpcc_exp_configs.csv")
+
+    # give a rough estimate of when program will end
+    print(f"Total {len(configs)} experiments to be run, taking approximately {SLEEP_SEC * len(configs)} seconds.")
+
     for i, row in configs.iterrows():
-        print("\n" + "=*-+" * 5 + f"Now processing experiment at row {i} (0-based index)..." + "=*-+" * 5)
+        print("\n" + "=*-+" * 5 + f"Now processing experiment at row {i + 1}/{len(configs)}..." + "=*-+" * 5)
 
         # process bool args and add exp_param str
         raw_exp_info_dict: OrderedDict = row.to_dict(into=OrderedDict)
@@ -44,6 +54,9 @@ def main():
             raise ValueError(f"exit code {exit_code} is not 0! exp_info_dict content: {exp_info_dict}")
         else:
             print(f"Command above finished with exit code {exit_code}")
+
+        # space out the processes to avoid different processes accessing results/.expIDs at the same time
+        time.sleep(SLEEP_SEC)
 
     print(f"\n[Final Message] Congrats! Successfully submitted {len(configs)} jobs!")
 
@@ -111,8 +124,8 @@ def __process_boolean_options(exp_dict: OrderedDict) -> OrderedDict:
 
 def __generate_temporary_shell_script(template_txt: str, processed_exp_dict: OrderedDict) -> str:
     """generate and save the shell script to tmp folder. returns filled template """
-    assert EXP_PARAM_KEY in processed_exp_dict, f"code assumes dict is processed and has " \
-                                                f"{EXP_PARAM_KEY} key, which isn't found."
+    assert EXP_PARAM_KEY in processed_exp_dict, f"code assumes dict is processed and has the " \
+                                                f"'{EXP_PARAM_KEY}' key, which isn't found."
 
     shell_content = template_txt.format(**processed_exp_dict)
     with open(SH_FILE_PATH, "w") as file:
@@ -138,7 +151,5 @@ def execute_sbatch_shell_script(template_txt: str, processed_exp_dict: OrderedDi
 
 
 if __name__ == "__main__":
-    # use this if __name__ == "__main__" statement for testing;
-    #   once all ready, move everything into main() and uncomment following
     main()
 

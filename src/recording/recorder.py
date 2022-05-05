@@ -35,6 +35,7 @@ class Recorder():
         self.configID = self.train_args["configID"]
         self.exp_date = date.today().strftime("%B %d, %Y")
         self.using_seq_label = seq_y
+        self.dataset_name = C.DATA_SUBDIR
 
         # get unique experiment ID for current project folder
         self.exp_ID = int(_find_next_exp_ID())
@@ -65,6 +66,7 @@ class Recorder():
         self.average_epochs: float = 0
         self.std_epochs: float = 0
         self.best_split: int = -1     # index of the best performing split, 0-based
+        self.best_y_proba, self.best_y_true = None, None    # for inferring threshold during eval
 
         if self.verbose:
             print("Now recording experiment #{}".format(self.exp_ID))
@@ -74,6 +76,8 @@ class Recorder():
                           time_taken: str,
                           epoch_list: list,
                           best_split: int,
+                          best_y_proba: np.ndarray,
+                          best_y_true: np.ndarray,
                           model: Sequential = None,
                           norm_stats: dict = None,
                           train_history: list = None,
@@ -86,6 +90,8 @@ class Recorder():
         self.std_epochs = float(np.std(epoch_list))
         self.best_split = best_split
         self.time_taken = time_taken
+        self.best_y_true = best_y_true
+        self.best_y_proba = best_y_proba
 
         # create new path in results and experiment folders
         if not os.path.exists(self.exp_dir):
@@ -115,11 +121,15 @@ class Recorder():
                          true_preds_path: str="",
                          false_preds_path: str="",
                          custom_ahead: float=None,
-                         save_lookahead_windows=False) -> None:
+                         save_lookahead_windows=False,
+                         test_loader: MARSDataLoader=None) -> None:
         """save prediction for specified rows; separate files will be generated if no sequence label used and true and
         false pred paths are given."""
         # generate test DataFrame
-        test_df = generate_all_feat_df(self.loader, self.configID, inds=test_inds)
+        if test_loader is None:
+            # use original loader from the recorder if no test loader is specified
+            test_loader = self.loader
+        test_df = generate_all_feat_df(test_loader, self.configID, inds=test_inds)
 
         # append predictions
         if y_pred.ndim <=2:
@@ -159,7 +169,7 @@ class Recorder():
             true_df.to_csv(true_preds_path, index=False)
             print(f"saved {len(true_df)} true/correct predictions to {true_preds_path}")
             false_df.to_csv(false_preds_path, index=False)
-            print(f"saved {len(false_df)} true/correct predictions to {false_preds_path}")
+            print(f"saved {len(false_df)} false/incorrect predictions to {false_preds_path}")
             print(f"accuracy (for debugging): {len(true_df)/(len(true_df) + len(false_df))}")
         else:
             test_df.to_csv(self.pred_path, index=False)
@@ -320,8 +330,7 @@ class TestSetProcessor:
                 lookahead_destab_sustained_ico, lookahead_destab_sustained_eco
 
     def save_lookahead_windows(self, data_df: pd.DataFrame) -> pd.DataFrame:
-        """save lookahead windows of each entry in given DataFrame"""
-        # TODO where to put this? additional arg in predict.py?
+        """save lookahead windows of each entry in given DataFrame, effective if specified in predict.py args"""
         # output: [trial key, window_end], vel, pos, joystick,
         # locate lookahead sequences, note that first entry is last time step in input window
         lookahead_df_dict = {key:[] for key in [# "trial_key", "window_end",

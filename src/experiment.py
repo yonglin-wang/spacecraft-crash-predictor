@@ -14,7 +14,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import numpy as np
 import tensorflow as tf
-from sklearn.metrics import confusion_matrix, roc_auc_score
+from sklearn.metrics import confusion_matrix, roc_auc_score, precision_recall_curve
 
 import consts as C
 from utils import calculate_exec_time, parse_layer_size
@@ -80,7 +80,8 @@ def train(args: argparse.Namespace):
     all_split_results = OrderedDict([(metric_name, []) for metric_name in C.RES_COLS])
 
     # record best performing stats and model for saving results
-    best_test_inds, best_y_preds, best_model, best_norm_stat = None, None, None, None
+    best_test_inds, best_y_preds, best_model, best_norm_stat, best_y_true, best_y_proba = None, None, None, \
+                                                                                          None, None, None
     best_split_num = -1
     best_performance_metric = 0
     all_epochs = []
@@ -99,7 +100,7 @@ def train(args: argparse.Namespace):
             class_weights[1] = _balance_weight(loader, train_inds)
 
         # train split
-        train_hist, model, val_results, y_preds, normalization_stats = train_one_split(args, loader,
+        train_hist, model, val_results, y_preds, normalization_stats, y_true, y_proba = train_one_split(args, loader,
                                                                           X_all, y_all,
                                                                           train_inds, test_inds,
                                                                           fit_ver, class_weights, recorder.using_seq_label,
@@ -117,17 +118,22 @@ def train(args: argparse.Namespace):
             best_performance_metric = val_results[C.PERF_METRIC]
             best_test_inds, best_y_preds, best_model, best_split_num, best_norm_stat = \
                 test_inds, y_preds, model, split_number, normalization_stats
+            best_y_true, best_y_proba = y_true, y_proba
 
     # record experiment outputs
     assert best_split_num >= 0 \
            and best_test_inds is not None \
            and best_y_preds is not None \
+           and best_y_true is not None \
+           and best_y_proba is not None \
            and best_performance_metric > 0, "update best failed"
     time_str = calculate_exec_time(begin, scr_name=__file__, verbose=loader.verbose)
     recorder.record_experiment(all_split_results,
                                time_str,
                                all_epochs,
                                best_split_num,
+                               best_y_proba,
+                               best_y_true,
                                model=best_model,
                                norm_stats=best_norm_stat,
                                train_history=all_training_history,
@@ -160,7 +166,8 @@ def train_one_split(args: argparse.Namespace,
                     using_seq_label: bool,
                     exp_number: int,
                     split_number: int
-                    ) -> Tuple[tf.keras.callbacks.History, tf.keras.Sequential, dict, np.ndarray, dict]:
+                    ) -> Tuple[tf.keras.callbacks.History, tf.keras.Sequential, dict, np.ndarray,
+                               dict, np.ndarray, np.ndarray]:
     """function that trains a model and returns train history, the model, and test set results dictionary"""
     # get train and test data from indices
     X_train = X_all[train_inds]
@@ -229,7 +236,7 @@ def train_one_split(args: argparse.Namespace,
     if not args.silent:
         print("Evaluation done, results: {}".format(eval_res))
 
-    return history, model, results, y_pred, norm_stats
+    return history, model, results, y_pred, norm_stats, y_test, y_pred_proba
 
 
 def _convert_class_weight_to_sample_weight(class_weights:dict, y_labels: np.ndarray) -> np.ndarray:
@@ -420,11 +427,9 @@ def print_split_info(inds_train, inds_test, X_train, X_test, y_train, y_test, cl
 
 
 def main():
-
     # Argparser
     # noinspection PyTypeChecker
-    argparser = argparse.ArgumentParser(prog="Experiment Argparser",
-                                        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    argparser = C.create_template_argparser("Experiment Argparser")
 
     # Preprocessing flags
     argparser.add_argument(

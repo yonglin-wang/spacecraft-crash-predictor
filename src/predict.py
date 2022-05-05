@@ -68,7 +68,7 @@ def _get_recorder(exp_id: int, exp_parent_dir: str) -> Recorder:
     if not exp_dir_match:
         raise ValueError(f"Cannot find experiment folder for id {exp_id}")
     if len(exp_dir_match) > 1:
-        raise ValueError(f"More than 1 experiment folders found for id {exp_id}")
+        raise ValueError(f"More than 1 experiment folders found for id {exp_id}; regex pattern: {pat.pattern}")
     rec_path = os.path.join(exp_parent_dir, exp_dir_match[0], C.REC_BASENAME)
 
     # load recorder
@@ -116,7 +116,9 @@ def _save_prediction_results(res: dict, recorder: Recorder,
                 "gap": curr_loader.time_gap,
                 "config id": recorder.configID,
                 "decision threshold": threshold,
-                "recall for inferring threshold": recall_at if recall_at else "not specified"
+                "recall for inferring threshold": recall_at if recall_at else "not specified",
+                "test set name": C.DATA_SUBDIR,
+                "train set name": recorder.dataset_name
                 })
 
     # open results df and save results
@@ -141,7 +143,8 @@ def _save_test_predictions(pred_id: int,
                            test_inds: np.ndarray,
                            save_npz: bool=False,
                            save_csv: bool=True,
-                           save_lookahead_windows: bool=False
+                           save_lookahead_windows: bool=False,
+                           test_loader: MARSDataLoader=None
                            ):
     """Save test set predictions (inputs, probabilities, predicted labels, true labels)"""
 
@@ -179,7 +182,7 @@ def _save_test_predictions(pred_id: int,
     if save_csv:
         recorder.save_predictions(test_inds, y_pred, true_preds_path=true_path,
                                   false_preds_path=false_path, custom_ahead=test_ahead,
-                                  save_lookahead_windows=save_lookahead_windows)
+                                  save_lookahead_windows=save_lookahead_windows, test_loader=test_loader)
 
 
 def _infer_decision_threshold(y_proba: np.ndarray,
@@ -231,17 +234,17 @@ def run_prediction(args: argparse.Namespace):
     model = _load_model(exp_recorder.model_path)
 
     # get results
-    eval_res = model.evaluate(X_test, y_test, return_dict=True, verbose=verbose)
     y_proba = model.predict(X_test)
 
     # determine decision threshold for converting probability to labels
     default_threshold = exp_recorder.train_args["threshold"]
-    threshold = _infer_decision_threshold(y_proba, y_test, default_threshold, results_at_recall=args.at_recall)
+    threshold = _infer_decision_threshold(exp_recorder.best_y_proba, exp_recorder.best_y_true,
+                                          default_threshold, results_at_recall=args.at_recall)
     y_pred = y_proba.copy()
     y_pred[y_pred >= threshold] = 1
     y_pred[y_pred < threshold] = 0
 
-    all_res = compute_test_eval_results(y_pred, y_test, y_proba, eval_res)
+    all_res = compute_test_eval_results(y_pred, y_test, y_proba)
 
     print(f"Evaluation results at {threshold} decision threshold: {all_res}")
 
@@ -251,10 +254,12 @@ def run_prediction(args: argparse.Namespace):
     if args.save_preds_csv or args.save_preds_npz:
         # save the actual predictions for each data, if needed
         _save_test_predictions(pred_ID, X_test, y_test, y_proba, y_pred, exp_recorder, args.ahead, threshold, sample_inds,
-                               save_npz=args.save_preds_npz, save_csv=args.save_preds_csv, save_lookahead_windows=args.save_lookahead_windows)
+                               save_npz=args.save_preds_npz, save_csv=args.save_preds_csv, save_lookahead_windows=args.save_lookahead_windows, test_loader=current_dataset_loader)
+
+    print(f"Prediction result #{pred_ID} saved succesfully!")
 
 
-def compute_test_eval_results(y_pred, y_true, y_proba, eval_res):
+def compute_test_eval_results(y_pred, y_true, y_proba):
     """helper function to compute and return dictionary containing all results"""
     tn, fp, fn, tp = confusion_matrix(y_true.flatten(), y_pred.flatten()).ravel()
 
@@ -266,10 +271,6 @@ def compute_test_eval_results(y_pred, y_true, y_proba, eval_res):
                 "fn": int(fn),
                 "tp": int(tp),
                 "auc_sklearn": roc_auc_score(y_true.flatten(), y_proba.flatten()),
-                C.PAT85R: eval_res[C.PAT85R],
-                C.PAT90R: eval_res[C.PAT90R],
-                C.PAT95R: eval_res[C.PAT95R],
-                C.PAT99R: eval_res[C.PAT99R],
                 "accuracy": accuracy_score(y_true, y_pred),
                 "precision": precision_score(y_true, y_pred),
                 "recall": recall_score(y_true, y_pred)
@@ -297,9 +298,9 @@ def _find_nearest_value_idx(array: np.ndarray, value: float) -> Tuple[float, int
 def main():
     # command line parser
     # noinspection PyTypeChecker
-    parser = argparse.ArgumentParser(prog="predict.py",
-                                     description="Run saved model on the held out test set.",
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = C.create_template_argparser("Test-set Prediction Program",
+                                         description="Run saved model on the specified held out test set")
+
     parser.add_argument("exp_id",
                         type=int,
                         help="ID of the experiment to load saved model from")

@@ -104,8 +104,9 @@ def _clean_metadata(meta_df: pd.DataFrame) -> pd.DataFrame:
     meta_df = meta_df[meta_df.phase == 3]
     # locate buggy indices. current condition: single-reading human episodes and their corresponding crashes
     buggy_human_segs = meta_df[meta_df.reading_num <= C.MIN_ENTRIES_IN_WINDOW].index
-    assert len(buggy_human_segs) == 16
 
+    # different datasets have different numbers of buggy datasets
+    print(f"excluding {len(buggy_human_segs)} buggy segments (i.e. segments with no more than {C.MIN_ENTRIES_IN_WINDOW} readings)")
     return meta_df.drop(meta_df[meta_df.index.isin(set(buggy_human_segs))].index)
 
 
