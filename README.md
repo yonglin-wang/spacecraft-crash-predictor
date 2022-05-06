@@ -75,6 +75,12 @@ In order to run the code properly, you'll need the raw data file ```data_all.csv
 3. Rename the downloaded file to ```data_all.csv.zip``` if not already. 
 4. In the [data/](data/) directory, create a new folder called ```dataset_name``` and put the file under [data/dataset_name] directory. After this step, the file should exist at  [data/dataset_name/data_all.csv.zip](./data/dataset_name/data_all.csv.zip).
 >Note that `SupineMARS` dataset will be used in this demonstration. You can also use other dataset names, as long as their data file exists at `data/<dataset_name>/data_all.csv.zip`.
+#### Using a Test-only Dataset
+We have a use case where we would like the entire dataset to be used for evaluation only (i.e. no training set, as in `train_ind.npy` will contain no index after the preprocessing script finishes). 
+
+To enable such functionality, our code will decide whether a dataset is for evaluation only based on its name--if a dataset name starts with `testonly_`, the program will recognize it as a test-only dataset, and the following behaviors will be in effect:
+* windows extracted from a dataset whose name starts with `testonly_` will all be used in test set; no window will be assigned to training set
+* running experiment.py on a dataset starting with `testonly_` will result in error
 
 ### Instructions for Changes in [consts.py](src/consts.py)
 When adding a new dataset, you'll also need to make changes in [consts.py](src/consts.py), in order to run the code properly. 
