@@ -128,20 +128,26 @@ class Splitter:
 def _save_test_train_split(episode_ids: list,
                            out_dir:str,
                            valid_non_crashed_ids: Dict[str, List[int]],
-                           valid_crashed_ids: Dict[str, List[int]]):
+                           valid_crashed_ids: Dict[str, List[int]],
+                           test_only_dataset: bool=False):
     """save stratified test vs. train+val splits"""
-    # change to ndarray for faster indexing
-    episode_ids = np.array(episode_ids)
 
     # convert {<trial key>: [<episode id>]} dict to lists of ints
     crash_id_list = [id for id_list in valid_crashed_ids.values() for id in id_list]
     non_crash_id_list = [id for id_list in valid_non_crashed_ids.values() for id in id_list]
 
-    # split episode ids in each class and combine
-    crash_train, crash_test = train_test_split(crash_id_list, test_size=0.1, random_state=C.RANDOM_SEED, shuffle=True)
-    non_crash_train, non_crash_test = train_test_split(non_crash_id_list, test_size=0.1, random_state=C.RANDOM_SEED, shuffle=True)
-    train_episode_id = crash_train + non_crash_train
-    test_episode_id = crash_test + non_crash_test
+    if test_only_dataset:
+        train_episode_id = []
+        test_episode_id = crash_id_list + non_crash_id_list
+    else:
+        # change to ndarray for faster indexing
+        episode_ids = np.array(episode_ids)
+
+        # split episode ids in each class and combine
+        crash_train, crash_test = train_test_split(crash_id_list, test_size=C.TEST_SIZE, random_state=C.RANDOM_SEED, shuffle=True)
+        non_crash_train, non_crash_test = train_test_split(non_crash_id_list, test_size=C.TEST_SIZE, random_state=C.RANDOM_SEED, shuffle=True)
+        train_episode_id = crash_train + non_crash_train
+        test_episode_id = crash_test + non_crash_test
 
     # extract corresponding input train and test indices based on input episode ids
     train_inds = np.where(np.isin(episode_ids, train_episode_id))[0]
@@ -150,6 +156,10 @@ def _save_test_train_split(episode_ids: list,
     # save split indices
     np.save(os.path.join(out_dir, C.INDS_PATH['train']), np.array(train_inds))
     np.save(os.path.join(out_dir, C.INDS_PATH['test']), np.array(test_inds))
+
+    assert len(train_inds) + len(test_inds) == len(episode_ids), f"sum of train and test samples " \
+                                                                 f"({len(train_inds) + len(test_inds)}) does not " \
+                                                                 f"equal to total sample size ({len(episode_ids)})."
 
     return train_inds, test_inds
 

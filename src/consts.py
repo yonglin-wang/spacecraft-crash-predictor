@@ -20,11 +20,16 @@ DATA_SUBDIR = sys.argv[1]
 # below is all the acceptable options of DATA_SUBDIR, will be validated by argparser
 SUPINE_MARS = "SupineMARS"
 UPRIGHT_MARS = "UprightMARS"
+TESTONLY_UPRIGHT_MARS = "testonly_UprightMARS"
 # NORMAL_VIP  = "NormalVIP"
 # SCINT_VIP = "ScintillatingVIP"
 
 # DATA_SUBDIR_LIST = [SUPINE_MARS, UPRIGHT_MARS, NORMAL_VIP, SCINT_VIP]
-DATA_SUBDIR_LIST = [SUPINE_MARS, UPRIGHT_MARS]
+DATA_SUBDIR_LIST = [SUPINE_MARS, UPRIGHT_MARS, TESTONLY_UPRIGHT_MARS]
+
+# test only dataset prefix
+TEST_ONLY_DATASET_PREFIX = "testonly_"
+IS_TEST_ONLY_DATASET = DATA_SUBDIR.startswith(TEST_ONLY_DATASET_PREFIX)
 
 # ----
 # rand var
@@ -133,6 +138,7 @@ CONFIG_IDS = {1, 2, 3}
 
 # train test split config constants
 VAL_SIZE = 0.1
+TEST_SIZE = 0.1
 
 # for marking columns used in training in the output prediction file
 USED_COL_SUFFIX = "_InTrain"

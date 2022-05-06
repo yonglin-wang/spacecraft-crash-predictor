@@ -213,7 +213,8 @@ def generate_feature_files(window_size: float,
                            time_gap: float,
                            time_step: float,
                            out_dir: str,
-                           show_pbar=False) -> int:
+                           show_pbar: bool=False,
+                           test_only_dataset: bool=False) -> int:
     """
     Extract basic features columns from raw data and saving them to disk; main function of this script
     :author: Yonglin Wang
@@ -223,6 +224,7 @@ def generate_feature_files(window_size: float,
     :param time_gap: minimal length of time allowed between two crash events for sliding windows extraction
     :param time_step: the step to move window ahead in sliding window
     :param out_dir: output directory to save all features to
+    :param test_only_dataset: if True, all of the windows extracted will be test data, and none will be training data
     :return: total number of samples generated
     """
     # ensure output folder exists
@@ -363,7 +365,9 @@ def generate_feature_files(window_size: float,
                              (feat_arrays["episode_id"], "episode_id")]]
 
     # split data into train and test based on label
-    train_inds, test_inds = _save_test_train_split(feat_arrays["episode_id"], out_dir, valid_non_crashed_ids, valid_crashed_ids)
+    train_inds, test_inds = _save_test_train_split(feat_arrays["episode_id"], out_dir,
+                                                   valid_non_crashed_ids, valid_crashed_ids,
+                                                   test_only_dataset=test_only_dataset)
 
     logger.info("File generation done!\n")
 
@@ -377,28 +381,34 @@ def generate_feature_files(window_size: float,
 
     # display train-test split statistics
     y_label = np.array(feat_arrays["label"])
+    # TODO WHY len(test_y) only 565 samples when expected_length is 195031?
     train_y = y_label[train_inds]
     test_y = y_label[test_inds]
-    _, (train0, train1) = np.unique(train_y, return_counts=True)
+
+    if test_only_dataset:
+        train0, train1 = 0, 0
+    else:
+        _, (train0, train1) = np.unique(train_y, return_counts=True)
+
     _, (test0, test1) = np.unique(test_y, return_counts=True)
 
     logger.info("Total crash samples: {}\n"
                 "Total noncrash samples: {}\n"
                 "Total sample size: {}".format(crash_total, noncrash_total, expected_length))
-    logger.info("In training set: \n"
-                "Noncrash samples: {}\n"
-                "Crash samples: {}\n"
-                "Total training set size: {}\n"
-                "Training set 0:1 ratio: {}\n"
-                "In test set:\n"
-                "Noncrash samples: {}\n"
-                "Crash samples: {}\n"
-                "Total test set size: {}\n"
-                "Test set 0:1 ratio: {}\n".format(
-                                                    train0, train1, len(train_y), train0/train1,
-                                                    test0, test1, len(test_y), test0/test1
-                                                 )
-                )
+    if test_only_dataset:
+        logger.info("This is a test-only dataset. Training stats are not applicable.")
+    else:
+        logger.info(f"In training set: \n"
+                    f"Noncrash samples: {train0}\n"
+                    f"Crash samples: {train1}\n"
+                    f"Total training set size: {len(train_y)}\n"
+                    f"Training set 0:1 ratio: {train0/train1 if not test_only_dataset else 'NA'}\n"
+                    )
+    logger.info(f"In test set:\n"
+                f"Noncrash samples: {test0}\n"
+                f"Crash samples: {test1}\n"
+                f"Total test set size: {len(test_y)}\n"
+                f"Test set 0:1 ratio: {test0/test1}\n")
 
     logger.info("Feature generation done!")
 
